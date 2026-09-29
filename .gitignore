@@ -1,0 +1,33 @@
+## .NET / C#
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+.vs/
+.idea/
+
+## Secrets
+appsettings.Development.json
+appsettings.*.local.json
+secrets.json
+
+## Claude Code local settings
+.claude/
+
+## Local storage
+local-storage/
+
+## Logs
+logs/
+*.log
+
+## EF Core temp
+Migrations/
+
+## Temp tools
+.migration-runner/
+
+## OS
+.DS_Store
+Thumbs.db

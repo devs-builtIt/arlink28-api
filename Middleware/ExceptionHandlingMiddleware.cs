@@ -23,7 +23,8 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
             context.Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
             context.Response.ContentType = "application/json";
             var body = JsonSerializer.Serialize(
-                new { success = false, message = ex.Message, code = ex.Code.ToString() });
+                new ApiErrorResponse(false, ex.Message, ex.Code.ToString()),
+                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
             await context.Response.WriteAsync(body);
         }
         catch (OperationCanceledException)

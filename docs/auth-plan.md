@@ -49,6 +49,7 @@ See also: [ADR 0003](adr/0003-auth-approach.md) — why no ASP.NET Core Identity
 
 ```
 POST   /api/v1/auth/login
+GET    /api/v1/auth/me                          [Authorize]  current staff; 401 if deactivated
 POST   /api/v1/auth/logout                      [Authorize]
 PATCH  /api/v1/auth/change-password             [Authorize]
 POST   /api/v1/auth/reset-password/request

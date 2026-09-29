@@ -15,16 +15,18 @@ public class EmailService(
     private readonly EmailSettings _email = emailSettings.Value;
     private readonly AppSettings _app = appSettings.Value;
 
+    // Links point at the admin UI pages in arlink28-nextjs (app/(admin)/admin/...),
+    // which read the token from ?token=.
     public async Task SendInviteAsync(string toEmail, string plainToken, CancellationToken ct = default)
     {
-        var link = $"{_app.FrontendBaseUrl}/invite/accept?token={Uri.EscapeDataString(plainToken)}";
+        var link = $"{_app.FrontendBaseUrl}/admin/invite/accept?token={Uri.EscapeDataString(plainToken)}";
         var body = $"You have been invited to ARLink28.\n\nSet up your account here (link expires in 48 hours):\n{link}";
         await SendAsync(toEmail, "You've been invited to ARLink28", body, ct);
     }
 
     public async Task SendPasswordResetAsync(string toEmail, string plainToken, CancellationToken ct = default)
     {
-        var link = $"{_app.FrontendBaseUrl}/reset-password?token={Uri.EscapeDataString(plainToken)}";
+        var link = $"{_app.FrontendBaseUrl}/admin/reset-password/confirm?token={Uri.EscapeDataString(plainToken)}";
         var body = $"A password reset was requested for your ARLink28 account.\n\nReset your password here (link expires in 1 hour):\n{link}\n\nIf you did not request this, ignore this email.";
         await SendAsync(toEmail, "Reset your ARLink28 password", body, ct);
     }

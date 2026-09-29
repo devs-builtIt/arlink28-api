@@ -103,6 +103,21 @@ console.log(hist);
 await client.end();
 ```
 
+## Seeding the package catalogue
+
+`Data/Seed/` holds the 13 packages transcribed from the partner posters (ported from the old TypeScript seed). Load them with:
+
+```bash
+dotnet run --project Arlink28.Api.csproj -- seed-catalogue                    # from-prices as of today
+dotnet run --project Arlink28.Api.csproj -- seed-catalogue --today=2026-11-01 # as of another date
+```
+
+- It runs and exits; the server doesn't start. It refuses to run in Production without `--allow-production`.
+- It's safe to re-run: rows are matched by slug, and each seeded package's stays, features, rates and add-ons are reset to the poster data. Packages not in the seed are untouched, and a hero image is only added where a package has none.
+- It validates the data first (unknown references, stay nights, overlapping seasons) and writes nothing if a check fails.
+- Three packages are seeded as `Draft` because their posters contradict each other; the command prints each reason. They stay off the public API until someone confirms the numbers.
+- It's deliberately not run at startup: once packages are edited in the admin, a restart must not overwrite them.
+
 ## Build and check
 
 ```bash

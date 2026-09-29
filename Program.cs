@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Arlink28.Api.Data;
 using Arlink28.Api.Data.Entities;
+using Arlink28.Api.Data.Seed;
 using Arlink28.Api.Features.Shared.Interfaces;
 using Arlink28.Api.Helpers;
 using Arlink28.Api.Helpers.OptionsSetup;
@@ -62,6 +63,7 @@ try
 
     builder.Services.AddScoped<IPasswordHasher<Staff>, PasswordHasher<Staff>>();
     builder.Services.AddScoped<DataContextInitializer>();
+    builder.Services.AddScoped<CatalogueSeeder>();
 
     // Scrutor: auto-register services by lifetime marker interface
     builder.Services.Scan(s =>
@@ -146,6 +148,30 @@ try
     builder.Services.AddCors();
 
     var app = builder.Build();
+
+    // `dotnet run -- seed-catalogue [--today=YYYY-MM-DD] [--allow-production]`
+    // loads the poster catalogue (Data/Seed) and exits without starting the server.
+    if (args.Length > 0 && args[0] == "seed-catalogue")
+    {
+        if (app.Environment.IsProduction() && !args.Contains("--allow-production"))
+        {
+            Console.Error.WriteLine("Refusing to seed the catalogue in Production without --allow-production.");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var todayArg = args.FirstOrDefault(a => a.StartsWith("--today="));
+        var today = todayArg is null
+            ? DateOnly.FromDateTime(DateTime.UtcNow)
+            : DateOnly.Parse(todayArg["--today=".Length..]);
+
+        using var seedScope = app.Services.CreateScope();
+        var results = await seedScope.ServiceProvider.GetRequiredService<CatalogueSeeder>().SeedAsync(today);
+        foreach (var r in results)
+            Console.WriteLine($"{r.Action,-8} {r.Status,-10} {r.Slug}{(r.DataIssue is null ? "" : "  (draft: " + r.DataIssue + ")")}");
+        Console.WriteLine($"Seeded {results.Count} packages (from-prices as of {today:yyyy-MM-dd}).");
+        return;
+    }
 
     using (var scope = app.Services.CreateScope())
     {

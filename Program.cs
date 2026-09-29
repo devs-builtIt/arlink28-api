@@ -18,6 +18,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 using Serilog;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
@@ -116,10 +117,18 @@ try
     builder.Services.AddControllers()
         .AddFeatureFolders()
         .AddNewtonsoftJson(options =>
-            options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore);
+        {
+            options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
+            // Enums travel as names ("Operator"), matching the string fields in responses.
+            // Integers are still accepted on input.
+            options.SerializerSettings.Converters.Add(new StringEnumConverter());
+        });
 
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
+    // Generate schemas from the Newtonsoft settings above (enum names, not integers),
+    // not from System.Text.Json, which this app doesn't use for MVC.
+    builder.Services.AddSwaggerGenNewtonsoftSupport();
     builder.Services.AddCors();
 
     var app = builder.Build();

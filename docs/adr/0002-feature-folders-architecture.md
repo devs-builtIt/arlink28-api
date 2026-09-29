@@ -25,7 +25,7 @@ Features/
 
 Cross-cutting concerns live in top-level folders:
 - `Data/` — DbContext, entities, EF configurations
-- `Helpers/` — ApiResponse, Result, Money, PricingEngine, settings
+- `Helpers/` — Problems (error codes), Result, Money, PricingEngine, settings
 - `Middleware/` — ExceptionHandlingMiddleware
 
 **DI registration** uses Scrutor assembly scanning via `ITransient`, `IScoped`, `ISingleton` marker interfaces — no manual registration per service.

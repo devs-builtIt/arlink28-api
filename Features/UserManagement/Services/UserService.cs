@@ -25,7 +25,7 @@ public class UserService(
         await db.Staff
             .AsNoTracking()
             .OrderBy(s => s.Username)
-            .Select(s => new UserResponse(s.Id, s.Username, s.Email, s.Role.ToString(), s.IsActive, s.LastLoginAt, s.CreatedAt))
+            .Select(s => new UserResponse(s.Id, s.Username, s.Email, s.Role, s.IsActive, s.LastLoginAt, s.CreatedAt))
             .ToListAsync(ct);
 
     public async Task<Result> InviteUserAsync(InviteUserRequest request, Guid invitedById, CancellationToken ct = default)
@@ -84,7 +84,7 @@ public class UserService(
         await db.SaveChangesAsync(ct);
 
         var (jwtToken, expiresAt) = jwtService.IssueToken(staff);
-        return Result<AuthResponse>.Success(new AuthResponse(jwtToken, staff.Role.ToString(), staff.Username, expiresAt));
+        return Result<AuthResponse>.Success(new AuthResponse(jwtToken, staff.Role, staff.Username, expiresAt));
     }
 
     public async Task<Result> AssignRoleAsync(Guid userId, AssignRoleRequest request, Guid actorId, CancellationToken ct = default)

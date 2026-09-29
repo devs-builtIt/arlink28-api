@@ -12,18 +12,18 @@ namespace Arlink28.Api.Features.Catalogue.Controllers;
 public class ReferenceController(ICatalogueService catalogue) : ControllerBase
 {
     [HttpGet("destinations")]
-    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<DestinationResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(IReadOnlyList<DestinationResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ListDestinations(CancellationToken ct)
     {
         var result = await catalogue.ListDestinationsAsync(ct);
-        return Ok(ApiResponse<IReadOnlyList<DestinationResponse>>.Ok(result));
+        return Ok(result);
     }
 
     [HttpGet("partners")]
-    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<PartnerResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(IReadOnlyList<PartnerResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ListPartners(CancellationToken ct)
     {
         var result = await catalogue.ListPartnersAsync(ct);
-        return Ok(ApiResponse<IReadOnlyList<PartnerResponse>>.Ok(result));
+        return Ok(result);
     }
 }

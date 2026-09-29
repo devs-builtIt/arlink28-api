@@ -42,7 +42,7 @@ Data/
   ApplicationDbContextFactory  IDesignTimeDbContextFactory for migrations
 
 Helpers/
-  ApiResponse.cs        { success, message, data } response wrapper
+  Problems.cs           ErrorCodes + ApiProblem(): RFC 9457 Problem Details errors
   Result.cs             Result<T> — explicit success/failure pattern
   AppException.cs       Throws 400 from middleware
   Money.cs              ToMinor / FromMinor / Format (8 currencies, never floats)

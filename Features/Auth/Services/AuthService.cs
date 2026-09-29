@@ -66,7 +66,7 @@ public class AuthService(
         await db.SaveChangesAsync(ct);
 
         var (token, expiresAt) = jwtService.IssueToken(staff);
-        return Result<AuthResponse>.Success(new AuthResponse(token, staff.Role.ToString(), staff.Username, expiresAt));
+        return Result<AuthResponse>.Success(new AuthResponse(token, staff.Role, staff.Username, expiresAt));
     }
 
     public async Task<Result<MeResponse>> GetCurrentAsync(Guid staffId, DateTime tokenExpiresAt, CancellationToken ct = default)
@@ -77,7 +77,7 @@ public class AuthService(
             return Result<MeResponse>.Failure("Your session is no longer valid. Please sign in again.");
 
         return Result<MeResponse>.Success(
-            new MeResponse(staff.Id, staff.Username, staff.Email, staff.Role.ToString(), tokenExpiresAt));
+            new MeResponse(staff.Id, staff.Username, staff.Email, staff.Role, tokenExpiresAt));
     }
 
     public async Task LogoutAsync(Guid staffId, CancellationToken ct = default)

@@ -140,7 +140,7 @@ Features/
   Admin/                    Phase 3 (not yet built)
 
 Helpers/
-  ApiResponse.cs · Result.cs · AppException.cs · Money.cs · PricingEngine.cs
+  Problems.cs · Result.cs · AppException.cs · Money.cs · PricingEngine.cs
   Settings/AppSettings.cs
   OptionsSetup/             JwtBearerOptionsSetup · ConfigureSwaggerOptions · ConfigureCorsOptions
 

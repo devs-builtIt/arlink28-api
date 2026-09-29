@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using Arlink28.Api.Data;
 using Arlink28.Api.Data.Entities;
 using Arlink28.Api.Features.Shared.Interfaces;
+using Arlink28.Api.Helpers;
 using Arlink28.Api.Helpers.OptionsSetup;
 using Arlink28.Api.Helpers.Settings;
 using Arlink28.Api.Middleware;
@@ -124,6 +126,18 @@ try
             options.SerializerSettings.Converters.Add(new StringEnumConverter());
         });
 
+    // Every error is RFC 9457 Problem Details (ADR 0005): controller errors (ApiProblem),
+    // validation failures, exceptions (ExceptionHandlingMiddleware) and empty-bodied
+    // 401/403/404 (UseStatusCodePages). Each carries a stable `code` and the `traceId`.
+    builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = ctx =>
+    {
+        var problem = ctx.ProblemDetails;
+        problem.Extensions.TryAdd("traceId", Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier);
+        var status = problem.Status ?? ctx.HttpContext.Response.StatusCode;
+        problem.Extensions.TryAdd("code",
+            problem is HttpValidationProblemDetails ? ErrorCodes.ValidationFailed : ErrorCodes.ForStatus(status));
+    });
+
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
     // Generate schemas from the Newtonsoft settings above (enum names, not integers),
@@ -140,6 +154,7 @@ try
     }
 
     app.UseMiddleware<ExceptionHandlingMiddleware>();
+    app.UseStatusCodePages();
 
     app.UseSwagger();
     app.UseSwaggerUI(options =>

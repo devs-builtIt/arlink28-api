@@ -8,29 +8,50 @@
 | Node.js | 22+ (for migration runner only) |
 | A Supabase project | — |
 
-## Connection strings
+## Secrets and connection strings
 
-`appsettings.Development.json` has two connection strings:
+Local secrets live in **dotnet user-secrets** (`UserSecretsId` `arlink28-api-secrets` in the csproj). They override the placeholders in `appsettings.json`, which points at a local Postgres (`localhost:5432/arlink28_dev`) and must never hold real values. Set them with:
+
+```bash
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<connection string>" --project Arlink28.Api.csproj
+dotnet user-secrets set "ConnectionStrings:DirectConnection"  "<connection string>" --project Arlink28.Api.csproj
+dotnet user-secrets set "AppSettings:Secret"                  "<JWT signing key>"   --project Arlink28.Api.csproj
+dotnet user-secrets list --project Arlink28.Api.csproj   # check what's set
+```
+
+The dev database is Supabase. Both connection strings currently point at its pooler:
 
 | Key | Host | Port | Use |
 |-----|------|------|-----|
-| `DefaultConnection` | pooler (`aws-1-eu-west-1.pooler.supabase.com`) | 6543 | Runtime (EF Core queries) |
-| `DirectConnection` | direct (`db.<ref>.supabase.co`) | 5432 | EF Core migrations |
+| `DefaultConnection` | `aws-1-eu-west-1.pooler.supabase.com` | 5432 | Runtime (EF Core queries) |
+| `DirectConnection` | `aws-1-eu-west-1.pooler.supabase.com` | 5432 | EF Core migrations |
 
-The pooler uses PgBouncer transaction mode. The `ApplicationDbContextFactory` (used by `dotnet ef`) prefers `DirectConnection` for migrations. If the direct host is unreachable on your network, use the node runner (see below).
-
-Secrets stay in `appsettings.Development.json` (dev only) or dotnet user-secrets for production. Never commit passwords to `appsettings.json`.
+`ApplicationDbContextFactory` (used by `dotnet ef`) prefers `DirectConnection` and falls back to `DefaultConnection`. If you switch `DirectConnection` to Supabase's direct host (`db.<ref>.supabase.co`) and it's unreachable on your network, use the node runner (see below). Production moves to Postgres on the VPS (web repo ADR 0004), with secrets in environment variables.
 
 ## Run locally
 
 ```bash
 cd arlink28-api
-dotnet run --project Arlink28.Api.csproj
+dotnet run --project Arlink28.Api.csproj            # http profile
+dotnet run --project Arlink28.Api.csproj -lp https  # https profile
 ```
 
-- API: http://localhost:5001
-- Swagger UI: http://localhost:5001/swagger
-- Health check: http://localhost:5001/health
+Ports come from `Properties/launchSettings.json`:
+
+- API: http://localhost:5270 (https profile: https://localhost:7212)
+- Swagger UI: http://localhost:5270/swagger (spec: `/swagger/v1/swagger.json`)
+- Health check: http://localhost:5270/health
+
+The web app (arlink28-nextjs) expects the http profile: its `apps/web/.env.local` has `API_URL=http://localhost:5270`. After changing endpoints, refresh its typed client with `pnpm --filter @arlink28/api-client sync` while the API is running.
+
+## Responses and errors
+
+- **Success:** the body is the resource itself (no wrapper). Endpoints with nothing to return answer `204 No Content`.
+- **Errors:** every error is RFC 9457 Problem Details (`application/problem+json`) with a stable `code` and a `traceId`. Clients switch on `code`, never on `detail`.
+  - Controllers return errors with `this.ApiProblem(status, detail, code?)`.
+  - `ExceptionHandlingMiddleware` maps `AppException` → 400 and `QuoteException` → 422 (`NO_RATE_FOR_DATE`, …).
+  - Codes live in `Helpers/Problems.cs`.
+- **Declare every response** with `[ProducesResponseType]`, so the OpenAPI doc (and the web app's generated types) stay exact.
 
 ## Running migrations
 
@@ -70,7 +91,7 @@ const sql = readFileSync('docs/migrations/<NNN>_<name>.sql', 'utf8')
   .replace(/^﻿/, ''); // strip UTF-8 BOM added by dotnet ef
 
 const client = new Client({
-  connectionString: 'postgresql://postgres.<ref>:<password>@aws-1-eu-west-1.pooler.supabase.com:6543/postgres',
+  connectionString: 'postgresql://postgres.<ref>:<password>@aws-1-eu-west-1.pooler.supabase.com:5432/postgres',
   ssl: { rejectUnauthorized: false },
 });
 
@@ -122,31 +143,32 @@ dotnet test                          # when tests are added
 
 ```
 Arlink28.Api.csproj
-Program.cs                  Startup: EF Core, Scrutor, JWT, Swagger, health, CORS
-appsettings.json            Placeholder values — never real secrets
-appsettings.Development.json  Dev secrets (Supabase connection, JWT key)
+Program.cs                  Startup: EF Core, Scrutor, JWT, Problem Details, Swagger, health, CORS
+appsettings.json            Placeholder values — never real secrets (those are in user-secrets)
+Properties/launchSettings.json  Local ports: http 5270, https 7212
 
 Data/
   Entities/Common/          BaseEntity (Guid) · BaseAuditableEntity (+ CreatedAt, UpdatedAt)
-  Entities/                 15 entity classes
-  Configuration/            14 IEntityTypeConfiguration<T> files
+  Entities/                 16 entity classes + Enums.cs
+  Configuration/            16 IEntityTypeConfiguration<T> files
   ApplicationDbContext.cs
   ApplicationDbContextFactory.cs
+  DataContextInitializer.cs Seeds the bootstrap SuperAdmin at startup
 
 Features/
-  Shared/Interfaces/        ITransient · IScoped · ISingleton
-  Catalogue/                Phase 1 — public catalogue routes
-  Auth/                     Phase 2 scaffold
-  Admin/                    Phase 3 (not yet built)
+  Shared/                   ITransient · IScoped · ISingleton; JwtService, EmailService
+  Catalogue/                Public catalogue: packages, quote, destinations, partners
+  Auth/                     Login, /me, logout, change and reset password
+  UserManagement/           Staff list, invite, accept invite, role, deactivate (SuperAdmin)
 
 Helpers/
-  Problems.cs · Result.cs · AppException.cs · Money.cs · PricingEngine.cs
-  Settings/AppSettings.cs
+  Problems.cs · Result.cs · AppException.cs · Money.cs · PricingEngine.cs · PasswordRules.cs
+  Settings/                 AppSettings · EmailSettings · AdminBootstrapSettings
   OptionsSetup/             JwtBearerOptionsSetup · ConfigureSwaggerOptions · ConfigureCorsOptions
 
 Middleware/
   ExceptionHandlingMiddleware.cs
 
-Migrations/                 EF Core C# migration classes (auto-generated)
-docs/migrations/            Idempotent SQL scripts (committed, applied manually)
+Migrations/                 EF Core C# migration classes (created by the first `dotnet ef migrations add`; none yet)
+docs/migrations/            Idempotent SQL scripts (committed, applied manually; none yet)
 ```

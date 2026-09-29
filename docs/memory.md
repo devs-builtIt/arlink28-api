@@ -40,5 +40,5 @@ The EF CLI (`dotnet ef database update`) connects, reads the migration history t
 - No tests exist yet (`tests/` directory not scaffolded).
 - `Features/Auth/` is a placeholder — no login endpoint, no token issuance.
 - TypeScript client for `arlink28-nextjs` has not been generated from the OpenAPI spec.
-- `appsettings.Development.json` contains the real Supabase password — should be moved to dotnet user-secrets (see `docs/security.md`).
+- Dev secrets (Supabase connection strings, JWT secret) are in dotnet user-secrets; `appsettings.Development.json` is gone and was never committed (checked 2026-09-29). See `docs/security.md` R-01/R-02.
 - The `.migration-runner/` temp directory may still exist on disk (locked by a process during cleanup); it is in `.gitignore`.

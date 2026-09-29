@@ -26,8 +26,8 @@ All data currently served by Phase 1 routes is **Public** class. No Confidential
 |-------|-------|-------|----------|
 | Source code | Development team | Internal | GitHub (`Dametiqer/arlink28-api`) |
 | Supabase PostgreSQL database | Development team | Internal / Confidential (future) | Supabase eu-west-1 |
-| JWT signing secret | Development team | Restricted | `appsettings.Development.json` (dev) · Docker env (production) |
-| Supabase connection string + password | Development team | Restricted | `appsettings.Development.json` (dev) · Docker env (production) |
+| JWT signing secret | Development team | Restricted | dotnet user-secrets (dev) · Docker env (production) |
+| Supabase connection string + password | Development team | Restricted | dotnet user-secrets (dev) · Docker env (production) |
 | API container image | Development team | Internal | VPS Docker registry |
 | Swagger OpenAPI spec | Development team | Internal | `/swagger` — runtime only, disabled in production |
 | Serilog log files | Development team | Internal | VPS `/logs/` |
@@ -41,8 +41,8 @@ Risk score = Likelihood (1–3) × Impact (1–4). **Low** ≤ 3 · **Medium** 4
 
 | ID | Asset / Threat | Vulnerability | L | I | Score | ISO Control | Treatment | Status |
 |----|----------------|--------------|---|---|-------|-------------|-----------|--------|
-| R-01 | JWT secret · disclosure via committed config | Dev secret in `appsettings.Development.json` (committed to git) | 2 | 4 | **8 High** | A.8.24, A.5.17 | Move to dotnet user-secrets (dev) and Docker env var (prod) | **Open** |
-| R-02 | DB password · disclosure via committed config | Supabase password in `appsettings.Development.json` | 2 | 4 | **8 High** | A.8.24, A.5.17 | Move to dotnet user-secrets (dev) and Docker env var (prod) | **Open** |
+| R-01 | JWT secret · disclosure via committed config | Dev secret was in `appsettings.Development.json` (git-ignored; never committed, checked 2026-09-29) | 2 | 4 | **8 High** | A.8.24, A.5.17 | Dev: moved to dotnet user-secrets (done). Prod: Docker env var at VPS deploy | **Mitigated (dev)** |
+| R-02 | DB password · disclosure via committed config | Supabase password was in `appsettings.Development.json` (git-ignored; never committed, checked 2026-09-29) | 2 | 4 | **8 High** | A.8.24, A.5.17 | Dev: moved to dotnet user-secrets (done). Prod: Docker env var at VPS deploy | **Mitigated (dev)** |
 | R-03 | API · DoS / resource exhaustion | No rate limiting on any route | 2 | 2 | **4 Medium** | A.8.26, A.8.6 | Add global fixed-window limiter before Phase 2 | **Open** |
 | R-04 | Swagger spec · information disclosure | `/swagger` exposed with no auth in non-production envs | 2 | 1 | **2 Low** | A.8.3, A.8.26 | Disabled in production (`ASPNETCORE_ENVIRONMENT=Production`) | **Accepted — Low** |
 | R-05 | CORS · cross-origin data access | Dev origins (`localhost`) not overridden to prod domains | 1 | 3 | **3 Low** | A.8.26, A.8.20 | Set production domain env vars before VPS deploy | **Open** |
@@ -69,7 +69,7 @@ Risk score = Likelihood (1–3) × Impact (1–4). **Low** ≤ 3 · **Medium** 4
 | A.5.14 | Information transfer | **Partial** | All API traffic over HTTPS (enforced by Caddy). Supabase connection uses TLS. Internal VPS Docker network is unencrypted (accepted — private network). |
 | A.5.15 | Access control | **Partial** | Phase 1 routes are intentionally public. Role-based access (Admin, Staff, Customer) designed but not yet implemented (Phase 2). |
 | A.5.16 | Identity management | **Not started** | No user identities managed yet. Phase 2 scope. |
-| A.5.17 | Authentication information | **Open** | JWT secret and DB password in committed config (R-01, R-02). Move to secrets management. |
+| A.5.17 | Authentication information | **Partial** | JWT secret and DB password are in dotnet user-secrets for dev (R-01, R-02); production env vars pending VPS deploy. |
 | A.5.18 | Access rights | **Not started** | No access rights to provision yet. Phase 2/3 scope. |
 | A.5.19 | Information security in supplier relationships | **Partial** | Supabase is the primary supplier. See §5 (Supabase). No formal SLA reviewed yet. |
 | A.5.23 | Information security for use of cloud services | **Partial** | Supabase PostgreSQL in eu-west-1. Data residency confirmed. Supabase SOC 2 Type II available. |
@@ -101,7 +101,7 @@ Risk score = Likelihood (1–3) × Impact (1–4). **Low** ≤ 3 · **Medium** 4
 | A.8.5 | Secure authentication | **Partial** | JWT Bearer token validation implemented (`JwtBearerOptionsSetup`). No token issuance yet (Phase 2). `RequireHttpsMetadata = false` in dev — must be `true` in production. |
 | A.8.6 | Capacity management | **Open** | Supabase shared pooler limited to 60 connections. Monitor and set `Max Pool Size` in Npgsql. |
 | A.8.8 | Management of technical vulnerabilities | **Open** | No formal dependency scanning. Run `dotnet list package --vulnerable` on every PR. AutoMapper removed due to known CVE (GHSA-rvv3-g6hj-g44x). |
-| A.8.9 | Configuration management | **Open** | Secrets in committed config (R-01, R-02). Move to dotnet user-secrets (dev) and Docker env vars (prod). |
+| A.8.9 | Configuration management | **Partial** | Dev secrets in dotnet user-secrets; `appsettings.json` holds placeholders only (R-01, R-02). Production: Docker env vars at VPS deploy. |
 | A.8.11 | Data masking | **Not started** | No PII collected yet. Mask in logs and error responses when Phase 4/5 lands. |
 | A.8.12 | Data leakage prevention | **Implemented** | `ExceptionHandlingMiddleware` strips stack traces from all error responses. Serilog set to `Warning` minimum; no request bodies logged. |
 | A.8.15 | Logging | **Partial** | Serilog structured JSON to rolling file and console. `audit_logs` table records all admin writes (future). Log retention policy not yet defined. |
@@ -129,7 +129,7 @@ Risk score = Likelihood (1–3) × Impact (1–4). **Low** ≤ 3 · **Medium** 4
 | Encryption in transit | TLS 1.3 on pooler and direct connections |
 | SOC 2 Type II | Available on request from Supabase |
 | GDPR | Supabase DPA available — obtain before storing any customer PII |
-| Shared pooler trust | Port 6543 (PgBouncer transaction mode) — sufficient for current read-heavy load; evaluate session pooler or direct connection for Phase 2 auth writes |
+| Shared pooler trust | Supabase pooler on port 5432 (session mode) for both runtime and migrations. Dev only; production moves to Postgres on the VPS |
 | Formal SLA review | **Not yet done** — complete before VPS deploy |
 
 ### GitHub (source code hosting, A.5.19)
@@ -168,8 +168,8 @@ A formal incident response procedure must be written before Phase 2. Until then,
 
 | ID | Finding | Control | Priority |
 |----|---------|---------|----------|
-| R-01 | JWT secret in committed config | A.8.24, A.5.17 | **High — fix before VPS deploy** |
-| R-02 | DB password in committed config | A.8.24, A.5.17 | **High — fix before VPS deploy** |
+| R-01 | JWT secret in config | A.8.24, A.5.17 | Dev done (user-secrets); **set as env var at VPS deploy** |
+| R-02 | DB password in config | A.8.24, A.5.17 | Dev done (user-secrets); **set as env var at VPS deploy** |
 | R-03 | No rate limiting | A.8.26, A.8.6 | Medium — fix before Phase 2 |
 | R-05 | CORS origins not set to production domain | A.8.26, A.8.20 | Medium — fix before VPS deploy |
 | R-10 | No dependency vulnerability scanning | A.8.8 | Medium — add to PR checklist now |
@@ -185,7 +185,7 @@ A formal incident response procedure must be written before Phase 2. Until then,
 
 | Trigger | Action |
 |---------|--------|
-| Before VPS deploy | Resolve R-01, R-02, R-05; set `RequireHttpsMetadata = true`; write production runbook |
+| Before VPS deploy | Production secrets as env vars (R-01, R-02); resolve R-05; set `RequireHttpsMetadata = true`; write production runbook |
 | Before Phase 2 (Auth) | Full re-review of A.5.15–A.5.18, A.8.5; write incident response procedure; migrate JWT to RS256 |
 | Before Phase 3 (Admin CRUD) | Audit `[Authorize]` coverage; verify audit log completeness; set up staging environment |
 | Before Phase 4 (Payments) | Penetration test; PCI scope assessment; webhook signature verification; GDPR DPA with Supabase |

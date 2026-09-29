@@ -91,4 +91,4 @@ Errors throw `QuoteException` (not `AppException`), which `ExceptionHandlingMidd
 
 EF Core migrations are generated locally with `dotnet ef migrations add <Name>`. The SQL script is produced with `dotnet ef migrations script --idempotent` and committed to `docs/migrations/`. It is applied to Supabase using a one-shot node runner (the `pg` package, single connection) because the EF CLI loses its connection mid-migration against the shared pooler (PgBouncer transaction mode drops idle connections between statements).
 
-For migrations, the `ApplicationDbContextFactory` prefers `DirectConnection` (Supabase direct on port 5432) over `DefaultConnection` (pooler on port 6543). If the direct host isn't reachable from a given network, pass `--connection` to `dotnet ef` or use the node runner with the pooler string.
+For migrations, the `ApplicationDbContextFactory` prefers `DirectConnection` over `DefaultConnection`; in dev both currently point at the Supabase pooler on port 5432 (session mode), set in dotnet user-secrets. If the direct host isn't reachable from a given network, pass `--connection` to `dotnet ef` or use the node runner with the pooler string.

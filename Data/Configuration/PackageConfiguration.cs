@@ -12,6 +12,9 @@ public class PackageConfiguration : IEntityTypeConfiguration<Package>
         builder.Property(p => p.Id).HasDefaultValueSql("gen_random_uuid()");
         builder.HasIndex(p => p.Slug).IsUnique();
         builder.Property(p => p.Slug).HasMaxLength(100).IsRequired();
+        builder.Property(p => p.ProductType).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(p => p.Details).HasColumnType("jsonb");
+        builder.HasIndex(p => new { p.ProductType, p.Status });
         builder.Property(p => p.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(p => p.Title).HasMaxLength(200).IsRequired();
         builder.Property(p => p.Subtitle).HasMaxLength(200);

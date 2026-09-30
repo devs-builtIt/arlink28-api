@@ -17,7 +17,9 @@ public record EnquiryListItem(
     string? Currency,
     string Name,
     string Email,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    /// <summary>What the linked package is (HolidayPackage, Flight...); null for a general enquiry.</summary>
+    string? ProductType
 );
 
 /// <summary>How many enquiries sit in each status, whichever tab is open.</summary>
@@ -51,5 +53,6 @@ public record EnquiryDetail(
     string? SourceUrl,
     Guid? HandledById,
     DateTime CreatedAt,
-    DateTime UpdatedAt
+    DateTime UpdatedAt,
+    string? ProductType
 );

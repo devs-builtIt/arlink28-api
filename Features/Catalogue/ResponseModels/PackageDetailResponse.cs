@@ -1,4 +1,5 @@
 using Arlink28.Api.Data.Entities;
+using Newtonsoft.Json.Linq;
 
 namespace Arlink28.Api.Features.Catalogue.ResponseModels;
 
@@ -78,5 +79,8 @@ public record PackageDetailResponse(
     IReadOnlyList<FeatureResponse> Features,
     IReadOnlyList<AddOnResponse> AddOns,
     IReadOnlyList<MediaResponse> Media,
-    IReadOnlyList<SeasonRateResponse> Rates
+    IReadOnlyList<SeasonRateResponse> Rates,
+    string ProductType,
+    /// <summary>The type-specific fields; null for holiday packages.</summary>
+    JObject? Details
 );

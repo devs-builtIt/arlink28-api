@@ -28,6 +28,7 @@ public class AdminPackageContentService(ApplicationDbContext db) : IAdminPackage
     {
         var package = await LoadAsync(id, ct);
         if (package is null) return null;
+        HolidayOnly(package, "stays, rates and add-ons");
         if (stays.Count > 20) throw new AppException("A package can have at most 20 stays.");
 
         var propertyIds = stays.Select(s => s.PropertyId).Distinct().ToList();
@@ -83,6 +84,7 @@ public class AdminPackageContentService(ApplicationDbContext db) : IAdminPackage
     {
         var package = await LoadAsync(id, ct);
         if (package is null) return null;
+        HolidayOnly(package, "stays, rates and add-ons");
         if (rates.Count > 60) throw new AppException("A package can have at most 60 rates.");
 
         var seasonIds = rates.Select(r => r.SeasonId).Distinct().ToList();
@@ -128,6 +130,7 @@ public class AdminPackageContentService(ApplicationDbContext db) : IAdminPackage
     {
         var package = await LoadAsync(id, ct);
         if (package is null) return null;
+        HolidayOnly(package, "stays, rates and add-ons");
         if (addOns.Count > 40) throw new AppException("A package can have at most 40 add-ons.");
 
         foreach (var (a, n) in addOns.Select((a, i) => (a, i + 1)))
@@ -168,6 +171,13 @@ public class AdminPackageContentService(ApplicationDbContext db) : IAdminPackage
         var missing = new List<string>();
         if (string.IsNullOrWhiteSpace(p.Title)) missing.Add("A name");
         if (string.IsNullOrWhiteSpace(p.Summary)) missing.Add("A summary");
+        if (p.ProductType != ProductType.HolidayPackage)
+        {
+            // No stays, seasons or nights here: the details are checked when saved, so they only need to exist.
+            if (string.IsNullOrWhiteSpace(p.Details)) missing.Add("The details for this type");
+            if (p.Media.Count(m => m.Role == MediaRole.Hero) != 1) missing.Add("A main photo");
+            return missing;
+        }
         if (p.MinNights < 1 || p.Nights < p.MinNights) missing.Add("Nights that are at least the minimum stay, and at least one");
         if (p.Adults < 1) missing.Add("At least one adult");
         if (p.Stays.Count == 0) missing.Add("At least one stay");
@@ -207,6 +217,12 @@ public class AdminPackageContentService(ApplicationDbContext db) : IAdminPackage
         return await SaveAsync(package, ct);
     }
 
+    private static void HolidayOnly(Package package, string what)
+    {
+        if (package.ProductType != ProductType.HolidayPackage)
+            throw new AppException($"Only holiday packages have {what}.");
+    }
+
     private Task<Package?> LoadAsync(Guid id, CancellationToken ct) => db.Packages.WithContent().FirstOrDefaultAsync(p => p.Id == id, ct);
 
     private async Task<AdminPackageDetail> SaveAsync(Package package, CancellationToken ct)
@@ -218,8 +234,11 @@ public class AdminPackageContentService(ApplicationDbContext db) : IAdminPackage
         // Reload, so ordering, joins and the recomputed from-price are what a fresh GET returns.
         db.ChangeTracker.Clear();
         var fresh = await db.Packages.WithContent().FirstAsync(p => p.Id == package.Id, ct);
-        fresh.FromPriceMinor = FromPrice(fresh, Today);
-        await db.SaveChangesAsync(ct);
+        if (fresh.ProductType == ProductType.HolidayPackage)
+        {
+            fresh.FromPriceMinor = FromPrice(fresh, Today);
+            await db.SaveChangesAsync(ct);
+        }
         return ToDetail(fresh);
     }
 

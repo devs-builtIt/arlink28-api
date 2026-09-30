@@ -10,7 +10,8 @@ namespace Arlink28.Api.Features.Enquiries.Services.Interfaces;
 public interface IEnquiryService
 {
     Task<CreateEnquiryResponse> CreateAsync(CreateEnquiryRequest request, CancellationToken ct = default);
-    Task<EnquiryListResponse> ListAsync(string? status, int page, int pageSize, CancellationToken ct = default);
+    Task<EnquiryListResponse> ListAsync(
+        string? status, int page, int pageSize, string? type = null, CancellationToken ct = default);
     Task<EnquiryDetail?> GetAsync(Guid id, CancellationToken ct = default);
     Task<EnquiryDetail?> SetStatusAsync(Guid id, UpdateEnquiryRequest request, Guid actorId, CancellationToken ct = default);
 }

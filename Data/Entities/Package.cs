@@ -5,6 +5,9 @@ namespace Arlink28.Api.Data.Entities;
 public class Package : BaseAuditableEntity
 {
     public string Slug { get; set; } = string.Empty;
+    public ProductType ProductType { get; set; } = ProductType.HolidayPackage;
+    /// <summary>Type-specific fields as JSON (see ProductDetails). Null for holiday packages, which use the tables below.</summary>
+    public string? Details { get; set; }
     public PackageStatus Status { get; set; } = PackageStatus.Draft;
     public string Title { get; set; } = string.Empty;
     public string? Subtitle { get; set; }

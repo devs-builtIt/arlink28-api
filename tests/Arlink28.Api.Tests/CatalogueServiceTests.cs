@@ -73,6 +73,26 @@ public sealed class CatalogueServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task The_public_list_is_holidays_unless_another_type_or_all_is_asked_for()
+    {
+        Add("Safari week", 100_00);
+        var flight = Add("Nairobi to Zanzibar", 50_00);
+        flight.ProductType = ProductType.Flight;
+        flight.Details = """{"origin":"Nairobi","destination":"Zanzibar"}""";
+        _db.SaveChanges();
+
+        static PackageListRequest OfType(string? type) =>
+            new(null, null, null, null, null, null, Limit: 20, Type: type);
+
+        Assert.Equal(["Safari week"], (await _service.ListPackagesAsync(OfType(null))).Items.Select(i => i.Title));
+        var flights = (await _service.ListPackagesAsync(OfType("Flight"))).Items.Single();
+        Assert.Equal("Nairobi to Zanzibar", flights.Title);
+        Assert.Equal("Flight", flights.ProductType);
+        Assert.Equal("Zanzibar", (string?)flights.Details!["destination"]);
+        Assert.Equal(2, (await _service.ListPackagesAsync(OfType("all"))).Items.Count);
+    }
+
+    [Fact]
     public async Task Without_a_page_number_the_list_still_walks_by_cursor()
     {
         for (var i = 1; i <= 5; i++) Add($"Package {i}", i * 100_00);

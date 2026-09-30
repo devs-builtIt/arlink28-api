@@ -25,7 +25,7 @@ public class AdminPackageService(
     private readonly MediaStorageSettings _media = mediaOptions.Value;
 
     public async Task<AdminPackageListResponse> ListAsync(
-        string? status, string? search, string? destination, string? category, int page, int pageSize,
+        string? status, string? search, string? destination, string? category, int page, int pageSize, string? type = null,
         CancellationToken ct = default)
     {
         page = Math.Max(1, page);
@@ -40,6 +40,8 @@ public class AdminPackageService(
 
         if (!string.IsNullOrWhiteSpace(destination))
             matching = matching.Where(p => p.Destination.Slug == destination);
+        if (Enum.TryParse<ProductType>(type, ignoreCase: true, out var productType))
+            matching = matching.Where(p => p.ProductType == productType);
         if (!string.IsNullOrWhiteSpace(category))
             matching = matching.Where(p => p.Category == category.Trim().ToUpper());
 
@@ -64,7 +66,7 @@ public class AdminPackageService(
             p.Id, p.Slug, p.Title, p.Status.ToString(), p.Category, ToResponse(p.Destination),
             p.Nights, p.Adults, p.Children, p.BaseCurrency, p.FromPriceMinor,
             p.Media.Where(m => m.Role == MediaRole.Hero).OrderBy(m => m.SortKey).Select(m => m.Path).FirstOrDefault(),
-            p.Media.Count, p.UpdatedAt)).ToList();
+            p.Media.Count, p.UpdatedAt, p.ProductType.ToString(), ProductDetails.ToJson(p.Details))).ToList();
         return new AdminPackageListResponse(items, total, page, pageSize, counts);
     }
 
@@ -79,16 +81,24 @@ public class AdminPackageService(
         var destination = await db.Destinations.FirstOrDefaultAsync(d => d.Id == request.DestinationId, ct)
             ?? throw new AppException("That destination doesn't exist.");
 
+        var productType = request.ProductType ?? ProductType.HolidayPackage;
+        var details = ProductDetails.Normalize(productType, request.Details);
+
         var now = DateTime.UtcNow;
         var package = new Package
         {
+            ProductType = productType,
+            Details = details,
+            FromPriceMinor = productType == ProductType.HolidayPackage || request.FromPriceMinor is null or 0
+                ? null : request.FromPriceMinor,
             Slug = await UniqueSlugAsync(request.Title, ct),
             Status = PackageStatus.Draft,
             Title = request.Title.Trim(),
             Subtitle = Clean(request.Subtitle),
             Summary = Clean(request.Summary),
             Description = Clean(request.Description),
-            Category = request.Category.Trim().ToUpperInvariant(),
+            // Only holidays have a style (Safari, Lodge...); the other types are labelled by their own name.
+            Category = productType == ProductType.HolidayPackage ? request.Category.Trim().ToUpperInvariant() : productType.ToString().ToUpperInvariant(),
             Destination = destination,
             Nights = request.Nights,
             MinNights = request.Nights,
@@ -115,6 +125,13 @@ public class AdminPackageService(
                 ?? throw new AppException("That destination doesn't exist.");
         }
 
+        if (request.Details is not null)
+        {
+            if (package.ProductType == ProductType.HolidayPackage)
+                throw new AppException("Holiday packages don't have a details object; edit their stays and rates instead.");
+            package.Details = ProductDetails.Normalize(package.ProductType, request.Details);
+        }
+
         // The slug stays put on a rename: it's the customer-facing URL.
         if (request.Title is not null) package.Title = request.Title.Trim();
         if (request.Subtitle is not null) package.Subtitle = Clean(request.Subtitle);
@@ -134,11 +151,22 @@ public class AdminPackageService(
             package.MinNights = Math.Min(package.MinNights, package.Nights);
         }
         if (request.MinNights is not null) package.MinNights = request.MinNights.Value;
+        if (package.ProductType == ProductType.HolidayPackage && package.Nights < 1)
+            throw new AppException("A holiday package needs at least one night.");
         if (package.MinNights > package.Nights)
             throw new AppException("The minimum stay can't be longer than the package's nights.");
 
-        // The from-price only counts base-currency rates, so a currency change moves it.
-        package.FromPriceMinor = AdminPackageMapper.FromPrice(package, DateOnly.FromDateTime(DateTime.UtcNow));
+        if (package.ProductType == ProductType.HolidayPackage)
+        {
+            if (request.FromPriceMinor is not null)
+                throw new AppException("A holiday package's from-price comes from its season rates.");
+            // The from-price only counts base-currency rates, so a currency change moves it.
+            package.FromPriceMinor = AdminPackageMapper.FromPrice(package, DateOnly.FromDateTime(DateTime.UtcNow));
+        }
+        else if (request.FromPriceMinor is { } price)
+        {
+            package.FromPriceMinor = price == 0 ? null : price;
+        }
 
         package.UpdatedAt = DateTime.UtcNow;
         package.Version++;

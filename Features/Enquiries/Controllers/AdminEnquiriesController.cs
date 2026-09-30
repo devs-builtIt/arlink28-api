@@ -19,8 +19,9 @@ public class AdminEnquiriesController(IEnquiryService enquiries) : ControllerBas
     [HttpGet]
     [ProducesResponseType(typeof(EnquiryListResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> List(
-        [FromQuery] string? status, [FromQuery] int page = 1, [FromQuery] int pageSize = 25, CancellationToken ct = default)
-        => Ok(await enquiries.ListAsync(status, page, pageSize, ct));
+        [FromQuery] string? status, [FromQuery] string? type, [FromQuery] int page = 1, [FromQuery] int pageSize = 25,
+        CancellationToken ct = default)
+        => Ok(await enquiries.ListAsync(status, page, pageSize, type, ct));
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(EnquiryDetail), StatusCodes.Status200OK)]

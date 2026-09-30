@@ -232,6 +232,35 @@ public sealed class EnquiryServiceTests : IDisposable
         new(EnquiryType.General, null, null, null, "Sam Roe", email, null, "Group booking", "Ten of us in June.", true, null, null);
 
     [Fact]
+    public async Task The_list_shows_and_filters_by_what_kind_of_listing_was_asked_about()
+    {
+        var flight = AddPackage("Nairobi to Zanzibar", PackageStatus.Published);
+        flight.ProductType = ProductType.Flight;
+        _db.Enquiries.AddRange(
+            NewEnquiry("ENQ-T-0001", _safari, "Holiday enquirer"),
+            NewEnquiry("ENQ-T-0002", flight, "Flight enquirer"),
+            NewEnquiry("ENQ-T-0003", null, "General enquirer"));
+        await _db.SaveChangesAsync();
+
+        var all = await _service.ListAsync(null, 1, 25);
+        Assert.Equal(3, all.Total);
+        Assert.Equal("Flight", all.Items.Single(i => i.Name == "Flight enquirer").ProductType);
+        Assert.Null(all.Items.Single(i => i.Name == "General enquirer").ProductType);
+
+        var flights = await _service.ListAsync(null, 1, 25, "flight");
+        Assert.Equal(["Flight enquirer"], flights.Items.Select(i => i.Name));
+        Assert.Equal(1, flights.Counts.All); // the tabs follow the filter
+        Assert.Equal("Flight", (await _service.GetAsync(flights.Items[0].Id))!.ProductType);
+    }
+
+    private static Enquiry NewEnquiry(string reference, Package? package, string name) => new()
+    {
+        Id = Guid.NewGuid(), Reference = reference, Type = package is null ? EnquiryType.General : EnquiryType.Package,
+        Status = EnquiryStatus.New, PackageId = package?.Id, PackageTitle = package?.Title, Name = name,
+        Email = "x@example.com", ConsentAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow,
+    };
+
+    [Fact]
     public async Task A_package_enquiry_is_saved_with_the_apis_own_quote()
     {
         var created = await _service.CreateAsync(ForPackage());

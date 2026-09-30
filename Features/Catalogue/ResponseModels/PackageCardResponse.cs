@@ -1,3 +1,5 @@
+using Newtonsoft.Json.Linq;
+
 namespace Arlink28.Api.Features.Catalogue.ResponseModels;
 
 public record PackageCardResponse(
@@ -18,5 +20,8 @@ public record PackageCardResponse(
     /// <summary>Up to three lines worth showing on a card, highlights first.</summary>
     IReadOnlyList<string> Highlights,
     /// <summary>The lodges and camps, in the order guests visit them.</summary>
-    IReadOnlyList<string> Lodges
+    IReadOnlyList<string> Lodges,
+    string ProductType,
+    /// <summary>The type-specific fields (route, fee, room...); null for holiday packages.</summary>
+    JObject? Details
 );

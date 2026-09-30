@@ -27,10 +27,16 @@ public class EnquiryNotifier(
         var e = await db.Enquiries.AsNoTracking().FirstOrDefaultAsync(x => x.Id == enquiryId, ct);
         if (e is null) return;
 
-        var (destination, party, photo) = await PackageDetailsAsync(e, ct);
+        var (destination, party, photo, productType) = await PackageDetailsAsync(e, ct);
         var notice = new EnquiryNotice(
             e.Reference,
-            e.Type == EnquiryType.Package ? "package enquiry" : e.Type.ToString().ToLowerInvariant(),
+            e.Type != EnquiryType.Package ? e.Type.ToString().ToLowerInvariant() : productType switch
+            {
+                ProductType.Flight => "flight enquiry",
+                ProductType.HotelReservation => "hotel reservation enquiry",
+                ProductType.VisaSupport => "visa support enquiry",
+                _ => "package enquiry",
+            },
             e.Name, e.Email, e.Phone, e.PackageTitle, e.CheckIn, e.Nights, TotalText(e), e.Subject, e.Message,
             $"{app.Value.FrontendBaseUrl.TrimEnd('/')}/admin/enquiries/{e.Id}",
             destination, party, e.CreatedAt, photo);
@@ -41,15 +47,17 @@ public class EnquiryNotifier(
     /// What makes the email read like a booking: where the package is, who it is packaged for, and its
     /// photo. With no photo (or one that is too big) the email simply has no picture.
     /// </summary>
-    private async Task<(string? Destination, string? Party, NoticePhoto? Photo)> PackageDetailsAsync(Enquiry e, CancellationToken ct)
+    private async Task<(string? Destination, string? Party, NoticePhoto? Photo, ProductType? Type)> PackageDetailsAsync(
+        Enquiry e, CancellationToken ct)
     {
-        if (e.PackageId is not { } packageId) return (null, null, null);
+        if (e.PackageId is not { } packageId) return (null, null, null, null);
 
         var package = await db.Packages.AsNoTracking()
             .Where(p => p.Id == packageId)
             .Select(p => new
             {
                 Destination = p.Destination.Name,
+                p.ProductType,
                 p.Adults,
                 p.Children,
                 Hero = p.Media
@@ -59,19 +67,21 @@ public class EnquiryNotifier(
                     .FirstOrDefault(),
             })
             .FirstOrDefaultAsync(ct);
-        if (package is null) return (null, null, null);
+        if (package is null) return (null, null, null, null);
 
+        // Only holidays are packaged for a party.
         var adults = $"{package.Adults} {(package.Adults == 1 ? "adult" : "adults")}";
-        var party = package.Children > 0
-            ? $"{adults}, {package.Children} {(package.Children == 1 ? "child" : "children")}"
-            : adults;
+        var party = package.ProductType != ProductType.HolidayPackage ? null
+            : package.Children > 0
+                ? $"{adults}, {package.Children} {(package.Children == 1 ? "child" : "children")}"
+                : adults;
 
         NoticePhoto? photo = null;
         if (package.Hero is not null && await media.ReadAsync(package.Hero, MaxPhotoBytes, ct) is { } bytes
             && media.SniffContentType(bytes.AsSpan(0, Math.Min(bytes.Length, 16))) is { } type)
             photo = new NoticePhoto(bytes, type);
 
-        return (package.Destination, party, photo);
+        return (package.Destination, party, photo, package.ProductType);
     }
 
     private static string? TotalText(Enquiry e)

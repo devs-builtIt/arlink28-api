@@ -232,6 +232,24 @@ public sealed class EnquiryServiceTests : IDisposable
         new(EnquiryType.General, null, null, null, "Sam Roe", email, null, "Group booking", "Ten of us in June.", true, null, null);
 
     [Fact]
+    public async Task An_enquiry_about_a_flight_is_saved_without_a_quote()
+    {
+        var flight = AddPackage("Nairobi to Zanzibar", PackageStatus.Published);
+        flight.ProductType = ProductType.Flight;
+        flight.Nights = 0;
+        flight.MinNights = 0;
+        await _db.SaveChangesAsync();
+
+        // A dated enquiry would fail to quote (no rates, no nights) if it were tried.
+        var created = await _service.CreateAsync(ForPackage(flight.Slug, Today.AddDays(20)) with { Nights = null });
+
+        var saved = await _db.Enquiries.SingleAsync(e => e.Reference == created.Reference);
+        Assert.Equal(flight.Id, saved.PackageId);
+        Assert.Equal(Today.AddDays(20), saved.CheckIn);
+        Assert.Null(saved.QuotedTotalMinor);
+    }
+
+    [Fact]
     public async Task The_list_shows_and_filters_by_what_kind_of_listing_was_asked_about()
     {
         var flight = AddPackage("Nairobi to Zanzibar", PackageStatus.Published);

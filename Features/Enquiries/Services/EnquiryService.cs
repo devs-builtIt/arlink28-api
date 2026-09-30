@@ -155,7 +155,7 @@ public class EnquiryService(
         var slug = request.Slug!.Trim();
         var package = await db.Packages.AsNoTracking()
             .Where(p => p.Slug == slug && p.Status == PackageStatus.Published)
-            .Select(p => new { p.Id, p.Title, p.BaseCurrency })
+            .Select(p => new { p.Id, p.Title, p.BaseCurrency, p.ProductType })
             .FirstOrDefaultAsync(ct)
             ?? throw new AppException($"Package '{slug}' is not available for enquiries.");
 
@@ -164,6 +164,8 @@ public class EnquiryService(
         enquiry.CheckIn = request.CheckIn;
         enquiry.Nights = request.Nights;
 
+        // Only holidays have season rates to quote from. A flight, hotel or visa is priced by staff.
+        if (package.ProductType != ProductType.HolidayPackage) return;
         if (request.CheckIn is not { } checkIn) return;
         try
         {

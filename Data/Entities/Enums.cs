@@ -15,3 +15,7 @@ public enum VideoProvider { YouTube, Vimeo }
 public enum StaffRole { SuperAdmin, Operator }
 
 public enum StaffTokenType { Invite, PasswordReset }
+
+public enum EnquiryType { Package, General, Booking, Partnership, Career, Investor }
+
+public enum EnquiryStatus { New, Contacted, Closed }

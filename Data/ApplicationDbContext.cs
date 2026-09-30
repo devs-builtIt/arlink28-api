@@ -20,6 +20,7 @@ public class ApplicationDbContext : DbContext
     public virtual DbSet<PackageAddOn> PackageAddOns { get; set; }
     public virtual DbSet<PackageMedia> PackageMedia { get; set; }
     public virtual DbSet<PropertyMedia> PropertyMedia { get; set; }
+    public virtual DbSet<Enquiry> Enquiries { get; set; }
     public virtual DbSet<AuditLog> AuditLogs { get; set; }
     public virtual DbSet<Staff> Staff { get; set; }
     public virtual DbSet<StaffToken> StaffTokens { get; set; }

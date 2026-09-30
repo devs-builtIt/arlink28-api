@@ -43,12 +43,16 @@ public record MediaResponse(
     int SortKey
 );
 
+public record SeasonRangeResponse(DateOnly Start, DateOnly End);
+
 public record SeasonRateResponse(
     string SeasonName,
     string SeasonSlug,
     string Currency,
     long PriceMinor,
-    long? ExtraNightPriceMinor
+    long? ExtraNightPriceMinor,
+    /// <summary>The check-in dates this rate covers.</summary>
+    IReadOnlyList<SeasonRangeResponse> Ranges
 );
 
 public record PackageDetailResponse(

@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="Arlink28.Api.csproj" />
+  <Project Path="tests/Arlink28.Api.Tests/Arlink28.Api.Tests.csproj" />
 </Solution>

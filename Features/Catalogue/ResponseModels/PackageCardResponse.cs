@@ -14,5 +14,9 @@ public record PackageCardResponse(
     string BaseCurrency,
     long? FromPriceMinor,
     bool Featured,
-    string? HeroImagePath
+    string? HeroImagePath,
+    /// <summary>Up to three lines worth showing on a card, highlights first.</summary>
+    IReadOnlyList<string> Highlights,
+    /// <summary>The lodges and camps, in the order guests visit them.</summary>
+    IReadOnlyList<string> Lodges
 );

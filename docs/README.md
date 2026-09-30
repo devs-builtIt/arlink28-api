@@ -31,6 +31,6 @@ Living documentation for the C# REST API backend. The frontend lives in `arlink2
 | **Pricing** | Stateless `PricingEngine.Quote(package, request)` in `Helpers/PricingEngine.cs`. No DB access. |
 | **Cursor pagination** | Keyset on `(Featured DESC, SortOrder ASC, Id ASC)`. Base64-encoded opaque string. |
 | **DI lifetime** | Implement `ITransient`, `IScoped`, or `ISingleton`; Scrutor auto-registers at startup. |
-| **Error shape** | `{ success, message, data }` for all responses; 422 + `code` field for quote errors. |
+| **Response shape** | Success bodies are the plain resource (no wrapper); 204 where there is none. Every error is RFC 9457 Problem Details (`application/problem+json`) with a stable `code` extension (`UNAUTHENTICATED`, `VALIDATION_FAILED`, `NOT_FOUND`, `NO_RATE_FOR_DATE`, …) and `traceId`; validation errors add `errors`. Codes live in `Helpers/Problems.cs`. |
 | **Audit trail** | Every admin write appended to `audit_logs` table (actor, action, entity, before/after JSON). |
 | **Migrations** | Generate SQL with `dotnet ef migrations script --idempotent`; apply via node runner against Supabase pooler. |

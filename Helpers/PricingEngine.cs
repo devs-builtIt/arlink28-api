@@ -72,14 +72,20 @@ public static class PricingEngine
             baseMinor += extraAmount;
         }
 
+        var people = package.Adults + package.Children;
         foreach (var (addOnId, qty) in request.AddOns)
         {
             var addOn = package.AddOns.FirstOrDefault(a => a.Id == addOnId)
                 ?? throw new QuoteException(QuoteError.UnknownAddOn, $"Add-on {addOnId} not found.");
+            if (addOn.Currency != request.Currency)
+                throw new QuoteException(QuoteError.CurrencyNotAvailable,
+                    $"Add-on \"{addOn.Name}\" is not priced in {request.Currency}.");
 
-            var addOnCurrency = addOn.Currency;
-            var addOnAmount = addOn.PriceMinor * qty;
-            lines.Add(new($"{addOn.Name} x{qty}", addOnAmount, addOnCurrency));
+            // Parity with the TypeScript engine: the requested quantity is multiplied
+            // by how many units the stay consumes (a per-day vehicle for 2 nights is 2 days).
+            var quantity = checked(AddOnUnits(addOn.Unit, nights, people) * qty);
+            var addOnAmount = checked(addOn.PriceMinor * quantity);
+            lines.Add(new($"{addOn.Name} x{quantity}", addOnAmount, addOn.Currency));
         }
 
         var totalMinor = lines
@@ -88,6 +94,15 @@ public static class PricingEngine
 
         return new QuoteResult(totalMinor, request.Currency, rate.PriceMinor, nights, lines);
     }
+
+    /// <summary>How many units of an add-on a stay consumes. PerDay counts days of stay = nights (plan Q7).</summary>
+    public static int AddOnUnits(AddOnUnit unit, int nights, int people) => unit switch
+    {
+        AddOnUnit.PerStay => 1,
+        AddOnUnit.PerNight or AddOnUnit.PerDay => nights,
+        AddOnUnit.PerPerson => people,
+        _ => throw new ArgumentOutOfRangeException(nameof(unit), unit, null),
+    };
 
     private static PackageRate FindRate(Package package, DateOnly checkIn, string currency)
     {

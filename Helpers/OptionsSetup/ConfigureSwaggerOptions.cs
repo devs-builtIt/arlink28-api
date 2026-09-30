@@ -14,6 +14,11 @@ public class ConfigureSwaggerOptions(IApiVersionDescriptionProvider provider) : 
             options.SwaggerDoc(description.GroupName, CreateInfoForApiVersion(description));
         }
 
+        // Honour <Nullable>enable</Nullable>: non-nullable properties are required and not
+        // nullable in the schema, so generated clients don't make every field optional.
+        options.SupportNonNullableReferenceTypes();
+        options.NonNullableReferenceTypesAsRequired();
+
         options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
             Name = "Authorization",

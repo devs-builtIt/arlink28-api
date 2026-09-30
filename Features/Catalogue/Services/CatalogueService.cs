@@ -16,8 +16,6 @@ public class CatalogueService(ApplicationDbContext db) : ICatalogueService, ISco
         var query = db.Packages
             .AsNoTracking()
             .Where(p => p.Status == PackageStatus.Published)
-            .Include(p => p.Destination)
-            .Include(p => p.Media)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(request.Destination))
@@ -38,6 +36,32 @@ public class CatalogueService(ApplicationDbContext db) : ICatalogueService, ISco
         if (request.Featured.HasValue)
             query = query.Where(p => p.Featured == request.Featured.Value);
 
+        if (!string.IsNullOrWhiteSpace(request.Q))
+        {
+            var term = request.Q.Trim().ToLower();
+            query = query.Where(p => p.Title.ToLower().Contains(term)
+                || (p.Subtitle != null && p.Subtitle.ToLower().Contains(term))
+                || (p.Summary != null && p.Summary.ToLower().Contains(term)));
+        }
+
+        var limit = Math.Clamp(request.Limit, 1, 100);
+
+        // A page number asks for numbered pages with a total, and a choice of order.
+        if (request.Page is { } requestedPage)
+        {
+            var page = Math.Max(1, requestedPage);
+            var total = await query.CountAsync(ct);
+            var ordered = (request.Sort?.ToLowerInvariant()) switch
+            {
+                "price" => query.OrderBy(p => p.FromPriceMinor == null).ThenBy(p => p.FromPriceMinor),
+                "-price" => query.OrderBy(p => p.FromPriceMinor == null).ThenByDescending(p => p.FromPriceMinor),
+                "nights" => query.OrderBy(p => p.Nights).ThenByDescending(p => p.Featured),
+                _ => query.OrderByDescending(p => p.Featured).ThenBy(p => p.SortOrder),
+            };
+            var pageItems = await WithCardData(ordered.ThenBy(p => p.Id).Skip((page - 1) * limit).Take(limit)).ToListAsync(ct);
+            return new PackageListResponse(pageItems.Select(MapToCard).ToList(), null, total, page, limit);
+        }
+
         // Cursor-based pagination: featured DESC, sortOrder ASC, id ASC
         if (!string.IsNullOrWhiteSpace(request.Cursor))
         {
@@ -51,12 +75,11 @@ public class CatalogueService(ApplicationDbContext db) : ICatalogueService, ISco
             }
         }
 
-        var limit = Math.Clamp(request.Limit, 1, 100);
-        var items = await query
-            .OrderByDescending(p => p.Featured)
-            .ThenBy(p => p.SortOrder)
-            .ThenBy(p => p.Id)
-            .Take(limit + 1)
+        var items = await WithCardData(query
+                .OrderByDescending(p => p.Featured)
+                .ThenBy(p => p.SortOrder)
+                .ThenBy(p => p.Id)
+                .Take(limit + 1))
             .ToListAsync(ct);
 
         string? nextCursor = null;
@@ -69,6 +92,14 @@ public class CatalogueService(ApplicationDbContext db) : ICatalogueService, ISco
 
         return new PackageListResponse(items.Select(MapToCard).ToList(), nextCursor);
     }
+
+    /// <summary>What a card shows: the destination, the hero photo, a few inclusions and the lodges.</summary>
+    private static IQueryable<Package> WithCardData(IQueryable<Package> packages) => packages
+        .Include(p => p.Destination)
+        .Include(p => p.Media)
+        .Include(p => p.Features).ThenInclude(f => f.Feature)
+        .Include(p => p.Stays).ThenInclude(s => s.Property)
+        .AsSplitQuery();
 
     public async Task<PackageDetailResponse?> GetPackageAsync(string slug, CancellationToken ct = default)
     {
@@ -142,8 +173,18 @@ public class CatalogueService(ApplicationDbContext db) : ICatalogueService, ISco
         new DestinationResponse(p.Destination.Id, p.Destination.Slug, p.Destination.Name, p.Destination.Country),
         p.Nights, p.Adults, p.Children,
         p.BaseCurrency, p.FromPriceMinor, p.Featured,
-        p.Media.Where(m => m.Role == MediaRole.Hero).OrderBy(m => m.SortKey).Select(m => m.Path).FirstOrDefault()
+        p.Media.Where(m => m.Role == MediaRole.Hero).OrderBy(m => m.SortKey).Select(m => m.Path).FirstOrDefault(),
+        CardHighlights(p),
+        p.Stays.OrderBy(s => s.SortOrder).Select(s => s.Property.Name).Distinct().Take(3).ToList()
     );
+
+    private static IReadOnlyList<string> CardHighlights(Package p) => p.Features
+        .Where(f => f.Section is FeatureSection.Highlight or FeatureSection.Included)
+        .OrderBy(f => f.Section == FeatureSection.Highlight ? 0 : 1).ThenBy(f => f.SortOrder)
+        .Select(f => f.LabelOverride ?? f.Feature?.Label ?? string.Empty)
+        .Where(label => label.Length > 0)
+        .Take(3)
+        .ToList();
 
     private static PackageDetailResponse MapToDetail(Package p) => new(
         p.Id, p.Slug, p.Title, p.Subtitle, p.Summary, p.Description,
@@ -168,7 +209,8 @@ public class CatalogueService(ApplicationDbContext db) : ICatalogueService, ISco
             m.Id, m.Role.ToString(), m.Path, m.Alt, m.Caption, m.Width, m.Height,
             m.VideoProvider?.ToString(), m.VideoId, m.SortKey)).ToList(),
         p.Rates.Select(r => new SeasonRateResponse(
-            r.Season.Name, r.Season.Slug, r.Currency, r.PriceMinor, r.ExtraNightPriceMinor)).ToList()
+            r.Season.Name, r.Season.Slug, r.Currency, r.PriceMinor, r.ExtraNightPriceMinor,
+            r.Season.Ranges.OrderBy(x => x.StartDate).Select(x => new SeasonRangeResponse(x.StartDate, x.EndDate)).ToList())).ToList()
     );
 
     private static IReadOnlyList<(Guid, int)> ParseAddOns(string? raw)

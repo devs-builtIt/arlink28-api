@@ -54,6 +54,7 @@ public static class CatalogueSeedData
         new("nairobi", "Nairobi", "KE"),
         new("masai-mara", "Masai Mara", "KE"),
         new("samburu", "Samburu", "KE"),
+        new("accra", "Accra", "GH"),
     ];
 
     public static readonly SeedPartner[] Partners =

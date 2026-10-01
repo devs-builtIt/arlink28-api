@@ -121,7 +121,8 @@ public static class EnquiryEmailTemplate
             </td></tr>
             """);
 
-        if (isPackage) page.Append(Summary(n));
+        // A flight or visa enquiry may come with no date and no price: then there is no trip block to show.
+        if (isPackage && (n.CheckIn is not null || n.Nights is not null || n.QuotedTotal is not null)) page.Append(Summary(n));
 
         page.Append(Guest(n));
 

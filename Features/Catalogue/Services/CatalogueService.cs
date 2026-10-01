@@ -1,5 +1,6 @@
 using Arlink28.Api.Data;
 using Arlink28.Api.Data.Entities;
+using Arlink28.Api.Features.AdminPackages.Services;
 using Arlink28.Api.Features.Catalogue.RequestModels;
 using Arlink28.Api.Features.Catalogue.ResponseModels;
 using Arlink28.Api.Features.Catalogue.Services.Interfaces;
@@ -17,6 +18,15 @@ public class CatalogueService(ApplicationDbContext db) : ICatalogueService, ISco
             .AsNoTracking()
             .Where(p => p.Status == PackageStatus.Published)
             .AsQueryable();
+
+        // The public /packages pages are holidays, so that is what you get unless you ask for another type or "all".
+        if (!string.Equals(request.Type, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            var type = Enum.TryParse<ProductType>(request.Type, ignoreCase: true, out var parsedType)
+                ? parsedType
+                : ProductType.HolidayPackage;
+            query = query.Where(p => p.ProductType == type);
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Destination))
             query = query.Where(p => p.Destination.Slug == request.Destination);
@@ -175,7 +185,8 @@ public class CatalogueService(ApplicationDbContext db) : ICatalogueService, ISco
         p.BaseCurrency, p.FromPriceMinor, p.Featured,
         p.Media.Where(m => m.Role == MediaRole.Hero).OrderBy(m => m.SortKey).Select(m => m.Path).FirstOrDefault(),
         CardHighlights(p),
-        p.Stays.OrderBy(s => s.SortOrder).Select(s => s.Property.Name).Distinct().Take(3).ToList()
+        p.Stays.OrderBy(s => s.SortOrder).Select(s => s.Property.Name).Distinct().Take(3).ToList(),
+        p.ProductType.ToString(), ProductDetails.ToJson(p.Details)
     );
 
     private static IReadOnlyList<string> CardHighlights(Package p) => p.Features
@@ -210,7 +221,8 @@ public class CatalogueService(ApplicationDbContext db) : ICatalogueService, ISco
             m.VideoProvider?.ToString(), m.VideoId, m.SortKey)).ToList(),
         p.Rates.Select(r => new SeasonRateResponse(
             r.Season.Name, r.Season.Slug, r.Currency, r.PriceMinor, r.ExtraNightPriceMinor,
-            r.Season.Ranges.OrderBy(x => x.StartDate).Select(x => new SeasonRangeResponse(x.StartDate, x.EndDate)).ToList())).ToList()
+            r.Season.Ranges.OrderBy(x => x.StartDate).Select(x => new SeasonRangeResponse(x.StartDate, x.EndDate)).ToList())).ToList(),
+        p.ProductType.ToString(), ProductDetails.ToJson(p.Details)
     );
 
     private static IReadOnlyList<(Guid, int)> ParseAddOns(string? raw)

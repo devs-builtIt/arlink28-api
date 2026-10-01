@@ -8,6 +8,7 @@ using Arlink28.Api.Helpers;
 using Arlink28.Api.Helpers.Settings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json.Linq;
 
 namespace Arlink28.Api.Tests;
 
@@ -236,6 +237,39 @@ public sealed class AdminPackageContentServiceTests : IDisposable
         Assert.Contains("A USD rate for a season that has not ended", outcome.Missing);
         Assert.Contains("A main photo", outcome.Missing);
         Assert.Equal("Draft", (await _packages.GetAsync(id))!.Status);
+    }
+
+    [Fact]
+    public async Task A_flight_publishes_with_a_summary_and_a_photo_and_keeps_its_own_price()
+    {
+        var created = await _packages.CreateAsync(new CreatePackageRequest(
+            "Nairobi to Zanzibar", _destination, "", 0, 0, 0, null, null, null, null, null, ProductType.Flight,
+            JObject.Parse("""{"origin":"Nairobi","destination":"Zanzibar"}"""), FromPriceMinor: 18000));
+        Assert.Equal(18000, created.FromPriceMinor);
+
+        var blocked = await _content.PublishAsync(created.Id);
+        Assert.Equal(["A summary", "A main photo"], blocked.Missing);
+
+        await _packages.UpdateAsync(created.Id, new UpdatePackageRequest(
+            null, null, null, null, null, null, null, null, "Return fares on the coast run.", null, null, null, null, null, null));
+        await _packages.AddPhotosAsync(created.Id, [new UploadedImage("plane.png", 16, () => new MemoryStream(
+            [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0, 0, 0, 0, 0]))]);
+        var published = await _content.PublishAsync(created.Id);
+
+        Assert.Empty(published.Missing);
+        Assert.Equal(18000, published.Detail!.FromPriceMinor); // not recomputed from (absent) rates
+    }
+
+    [Fact]
+    public async Task Stays_rates_and_add_ons_are_for_holidays_only()
+    {
+        var visa = await _packages.CreateAsync(new CreatePackageRequest(
+            "Kenya eTA", _destination, "", 0, 0, 0, null, null, null, null, null, ProductType.VisaSupport,
+            JObject.Parse("""{"country":"Kenya","visaType":"eTA"}""")));
+
+        await Assert.ThrowsAsync<AppException>(() => _content.ReplaceStaysAsync(visa.Id, [new(_manor, 1, null)]));
+        await Assert.ThrowsAsync<AppException>(() => _content.ReplaceRatesAsync(visa.Id, [Rate(_peak, 100)]));
+        await Assert.ThrowsAsync<AppException>(() => _content.ReplaceAddOnsAsync(visa.Id, []));
     }
 
     [Fact]

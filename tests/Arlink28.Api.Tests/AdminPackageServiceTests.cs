@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json.Linq;
 
 namespace Arlink28.Api.Tests;
 
@@ -209,6 +210,83 @@ public sealed class AdminPackageServiceTests : IDisposable
         Assert.Equal("Two nights", updated.Subtitle);
         Assert.Equal("SAFARI", updated.Category);
         Assert.True(updated.Featured);
+    }
+
+    private CreatePackageRequest NewFlight(JObject? details, string title = "Nairobi to Zanzibar") =>
+        new(title, _destinationId, "", 0, 0, 0, null, null, null, null, null, ProductType.Flight, details);
+
+    [Fact]
+    public async Task Packages_default_to_holidays_and_keep_no_details()
+    {
+        var created = await _service.CreateAsync(NewPackage());
+
+        Assert.Equal("HolidayPackage", created.ProductType);
+        Assert.Null(created.Details);
+    }
+
+    [Fact]
+    public async Task A_flight_stores_its_details_and_is_labelled_by_its_type()
+    {
+        var created = await _service.CreateAsync(NewFlight(JObject.Parse(
+            """{"origin":"Nairobi","destination":"Zanzibar","tripType":"Return","cabin":"Economy","ignored":"x"}""")));
+
+        Assert.Equal("Flight", created.ProductType);
+        Assert.Equal("FLIGHT", created.Category);
+        Assert.Equal("Zanzibar", (string?)created.Details!["destination"]);
+        Assert.Equal("Return", (string?)created.Details["tripType"]);
+        Assert.Null(created.Details["ignored"]); // unknown fields are dropped
+        Assert.Equal("Zanzibar", (string?)(await _service.GetAsync(created.Id))!.Details!["destination"]);
+    }
+
+    [Fact]
+    public async Task Details_that_do_not_fit_the_type_are_rejected()
+    {
+        await Assert.ThrowsAsync<AppException>(() => _service.CreateAsync(NewFlight(null)));
+        await Assert.ThrowsAsync<AppException>(() => _service.CreateAsync(NewFlight(JObject.Parse("""{"origin":"Nairobi"}"""))));
+        await Assert.ThrowsAsync<AppException>(() => _service.CreateAsync(NewFlight(
+            JObject.Parse("""{"origin":"A","destination":"B","cabin":"Sleeper"}"""))));
+    }
+
+    [Fact]
+    public async Task Details_can_be_replaced_but_not_added_to_a_holiday()
+    {
+        var flight = await _service.CreateAsync(NewFlight(JObject.Parse("""{"origin":"Nairobi","destination":"Zanzibar"}""")));
+        var holiday = await _service.CreateAsync(NewPackage());
+
+        var updated = await _service.UpdateAsync(flight.Id, new UpdatePackageRequest(
+            null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+            JObject.Parse("""{"origin":"Nairobi","destination":"Mombasa"}""")));
+
+        Assert.Equal("Mombasa", (string?)updated!.Details!["destination"]);
+        await Assert.ThrowsAsync<AppException>(() => _service.UpdateAsync(holiday.Id, new UpdatePackageRequest(
+            null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, JObject.Parse("{}"))));
+    }
+
+    [Fact]
+    public async Task A_holiday_still_needs_its_nights_and_a_visa_needs_a_country()
+    {
+        var holiday = await _service.CreateAsync(NewPackage());
+        await Assert.ThrowsAsync<AppException>(() => _service.UpdateAsync(holiday.Id, new UpdatePackageRequest(
+            null, null, null, 0, null, null, null, null, null, null, null, null, null, null, null)));
+
+        await Assert.ThrowsAsync<AppException>(() => _service.CreateAsync(new CreatePackageRequest(
+            "Kenya eTA", _destinationId, "", 0, 0, 0, null, null, null, null, null, ProductType.VisaSupport,
+            JObject.Parse("""{"visaType":"eTA"}"""))));
+        var visa = await _service.CreateAsync(new CreatePackageRequest(
+            "Kenya eTA", _destinationId, "", 0, 0, 0, null, null, null, null, null, ProductType.VisaSupport,
+            JObject.Parse("""{"country":"Kenya","visaType":"eTA","serviceFeeMinor":2500,"requirements":["Passport"]}""")));
+        Assert.Equal(2500, (long?)visa.Details!["serviceFeeMinor"]);
+    }
+
+    [Fact]
+    public async Task The_admin_list_can_be_filtered_by_type()
+    {
+        await _service.CreateAsync(NewPackage());
+        await _service.CreateAsync(NewFlight(JObject.Parse("""{"origin":"Nairobi","destination":"Zanzibar"}""")));
+
+        Assert.Equal(2, (await _service.ListAsync(null, null, null, null, 1, 25)).Items.Count);
+        Assert.Equal("Nairobi to Zanzibar", (await _service.ListAsync(null, null, null, null, 1, 25, "flight")).Items.Single().Title);
+        Assert.Equal("HolidayPackage", (await _service.ListAsync(null, null, null, null, 1, 25, "HolidayPackage")).Items.Single().ProductType);
     }
 
     [Fact]

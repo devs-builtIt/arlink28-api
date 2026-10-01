@@ -37,7 +37,8 @@ public static class AdminPackageMapper
             r.Id, r.SeasonId, r.Season.Name, r.Currency, r.PriceMinor, r.ExtraNightPriceMinor)).ToList(),
         p.AddOns.OrderBy(a => a.SortOrder).Select(a => new AdminAddOn(
             a.Id, a.Name, a.Description, a.Unit.ToString(), a.Currency, a.PriceMinor, a.SortOrder)).ToList(),
-        p.Media.OrderBy(m => m.SortKey).Select(ToResponse).ToList());
+        p.Media.OrderBy(m => m.SortKey).Select(ToResponse).ToList(),
+        p.ProductType.ToString(), ProductDetails.ToJson(p.Details));
 
     /// <summary>
     /// The lowest base-currency rate among seasons that still have a check-in date on or after

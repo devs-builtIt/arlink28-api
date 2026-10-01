@@ -26,10 +26,11 @@ public class AdminPackagesController(IAdminPackageService packages, IAdminPackag
         [FromQuery] string? search,
         [FromQuery] string? destination,
         [FromQuery] string? category,
+        [FromQuery] string? type,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
         CancellationToken ct = default)
-        => Ok(await packages.ListAsync(status, search, destination, category, page, pageSize, ct));
+        => Ok(await packages.ListAsync(status, search, destination, category, page, pageSize, type, ct));
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(AdminPackageDetail), StatusCodes.Status200OK)]

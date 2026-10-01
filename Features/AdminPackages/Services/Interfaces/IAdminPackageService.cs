@@ -14,7 +14,7 @@ public record UploadedImage(string FileName, long Length, Func<Stream> Open);
 public interface IAdminPackageService
 {
     Task<AdminPackageListResponse> ListAsync(
-        string? status, string? search, string? destination, string? category, int page, int pageSize, CancellationToken ct = default);
+        string? status, string? search, string? destination, string? category, int page, int pageSize, string? type = null, CancellationToken ct = default);
     Task<AdminPackageDetail?> GetAsync(Guid id, CancellationToken ct = default);
     Task<AdminPackageDetail> CreateAsync(CreatePackageRequest request, CancellationToken ct = default);
     Task<AdminPackageDetail?> UpdateAsync(Guid id, UpdatePackageRequest request, CancellationToken ct = default);

@@ -1,4 +1,5 @@
 using Arlink28.Api.Features.Catalogue.ResponseModels;
+using Newtonsoft.Json.Linq;
 
 namespace Arlink28.Api.Features.AdminPackages.ResponseModels;
 
@@ -16,7 +17,9 @@ public record AdminPackageSummary(
     long? FromPriceMinor,
     string? HeroImagePath,
     int MediaCount,
-    DateTime UpdatedAt
+    DateTime UpdatedAt,
+    string ProductType,
+    JObject? Details
 );
 
 /// <summary>How many packages sit in each status, for the tabs above the list. Ignores the status filter.</summary>
@@ -66,7 +69,10 @@ public record AdminPackageDetail(
     IReadOnlyList<AdminFeature> Features,
     IReadOnlyList<AdminRate> Rates,
     IReadOnlyList<AdminAddOn> AddOns,
-    IReadOnlyList<MediaResponse> Media
+    IReadOnlyList<MediaResponse> Media,
+    string ProductType,
+    /// <summary>The type-specific fields; null for holiday packages.</summary>
+    JObject? Details
 );
 
 public record DateRangeResponse(DateOnly Start, DateOnly End);

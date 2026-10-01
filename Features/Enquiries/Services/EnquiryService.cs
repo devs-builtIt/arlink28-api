@@ -84,18 +84,24 @@ public class EnquiryService(
         }
     }
 
-    public async Task<EnquiryListResponse> ListAsync(string? status, int page, int pageSize, CancellationToken ct = default)
+    public async Task<EnquiryListResponse> ListAsync(
+        string? status, int page, int pageSize, string? type = null, CancellationToken ct = default)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var byStatus = await db.Enquiries.AsNoTracking()
+        // The kind of listing the enquiry is about, from its package. General enquiries have none.
+        var matching = db.Enquiries.AsNoTracking().AsQueryable();
+        if (Enum.TryParse<ProductType>(type, ignoreCase: true, out var productType))
+            matching = matching.Where(e => e.Package != null && e.Package.ProductType == productType);
+
+        var byStatus = await matching
             .GroupBy(e => e.Status).Select(g => new { g.Key, Count = g.Count() }).ToListAsync(ct);
         int CountOf(EnquiryStatus s) => byStatus.FirstOrDefault(x => x.Key == s)?.Count ?? 0;
         var counts = new EnquiryStatusCounts(byStatus.Sum(x => x.Count), CountOf(EnquiryStatus.New),
             CountOf(EnquiryStatus.Contacted), CountOf(EnquiryStatus.Closed));
 
-        var filtered = db.Enquiries.AsNoTracking().AsQueryable();
+        var filtered = matching;
         if (Enum.TryParse<EnquiryStatus>(status, ignoreCase: true, out var parsed))
             filtered = filtered.Where(e => e.Status == parsed);
         var total = await filtered.CountAsync(ct);
@@ -103,6 +109,7 @@ public class EnquiryService(
         var rows = await filtered
             .OrderByDescending(e => e.CreatedAt).ThenBy(e => e.Id)
             .Skip((page - 1) * pageSize).Take(pageSize)
+            .Include(e => e.Package)
             .ToListAsync(ct);
 
         return new EnquiryListResponse(rows.Select(ToItem).ToList(), total, page, pageSize, counts);
@@ -110,7 +117,7 @@ public class EnquiryService(
 
     public async Task<EnquiryDetail?> GetAsync(Guid id, CancellationToken ct = default)
     {
-        var enquiry = await db.Enquiries.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id, ct);
+        var enquiry = await db.Enquiries.AsNoTracking().Include(e => e.Package).FirstOrDefaultAsync(e => e.Id == id, ct);
         return enquiry is null ? null : ToDetail(enquiry);
     }
 
@@ -148,7 +155,7 @@ public class EnquiryService(
         var slug = request.Slug!.Trim();
         var package = await db.Packages.AsNoTracking()
             .Where(p => p.Slug == slug && p.Status == PackageStatus.Published)
-            .Select(p => new { p.Id, p.Title, p.BaseCurrency })
+            .Select(p => new { p.Id, p.Title, p.BaseCurrency, p.ProductType })
             .FirstOrDefaultAsync(ct)
             ?? throw new AppException($"Package '{slug}' is not available for enquiries.");
 
@@ -157,6 +164,8 @@ public class EnquiryService(
         enquiry.CheckIn = request.CheckIn;
         enquiry.Nights = request.Nights;
 
+        // Only holidays have season rates to quote from. A flight, hotel or visa is priced by staff.
+        if (package.ProductType != ProductType.HolidayPackage) return;
         if (request.CheckIn is not { } checkIn) return;
         try
         {
@@ -189,10 +198,10 @@ public class EnquiryService(
 
     private static EnquiryListItem ToItem(Enquiry e) => new(
         e.Id, e.Reference, e.Type, e.Status, e.PackageTitle, e.Subject, e.CheckIn, e.Nights, e.QuotedTotalMinor,
-        e.Currency, e.Name, e.Email, e.CreatedAt);
+        e.Currency, e.Name, e.Email, e.CreatedAt, e.Package?.ProductType.ToString());
 
     private static EnquiryDetail ToDetail(Enquiry e) => new(
         e.Id, e.Reference, e.Type, e.Status, e.PackageId, e.PackageTitle, e.CheckIn, e.Nights,
         e.QuotedTotalMinor, e.Currency, e.Name, e.Email, e.Phone, e.Subject, e.Message, e.ConsentAt,
-        e.SourceUrl, e.HandledById, e.CreatedAt, e.UpdatedAt);
+        e.SourceUrl, e.HandledById, e.CreatedAt, e.UpdatedAt, e.Package?.ProductType.ToString());
 }

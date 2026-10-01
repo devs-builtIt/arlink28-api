@@ -14,5 +14,7 @@ public record PackageListRequest(
     /// <summary>featured (default), price (lowest first), -price (highest first) or nights (shortest first). Paged lists only.</summary>
     string? Sort = null,
     /// <summary>Matches part of the title, subtitle or summary.</summary>
-    string? Q = null
+    string? Q = null,
+    /// <summary>HolidayPackage (default), Flight, HotelReservation, VisaSupport, or "all".</summary>
+    string? Type = null
 );

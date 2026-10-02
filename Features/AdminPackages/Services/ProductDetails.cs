@@ -41,6 +41,17 @@ public record VisaDetails(
     string? Currency,
     List<string>? Requirements);
 
+/// <summary>
+/// An Elite private-aviation tier. Priced by quote, so this describes what is included. A tier built on
+/// another (Signature on Elite) names it in <paramref name="BasedOn"/> and lists only what it adds.
+/// </summary>
+public record CharterDetails(
+    string? Tier,
+    string? Tagline,
+    string? Audience,
+    string? BasedOn,
+    List<string>? Includes);
+
 public class FlightDetailsValidator : AbstractValidator<FlightDetails>
 {
     public FlightDetailsValidator()
@@ -85,6 +96,21 @@ public class VisaDetailsValidator : AbstractValidator<VisaDetails>
     }
 }
 
+public class CharterDetailsValidator : AbstractValidator<CharterDetails>
+{
+    public CharterDetailsValidator()
+    {
+        RuleFor(x => x.Tier).NotEmpty().WithMessage("Name the tier, for example Elite or Signature.");
+        RuleFor(x => x.Tier).MaximumLength(60);
+        RuleFor(x => x.Tagline).MaximumLength(300);
+        RuleFor(x => x.Audience).MaximumLength(600);
+        RuleFor(x => x.BasedOn).MaximumLength(120);
+        RuleFor(x => x.Includes).NotEmpty().WithMessage("List what this tier includes.");
+        RuleFor(x => x.Includes).Must(i => i is null || i.Count <= 40).WithMessage("That is too many items; 40 at most.");
+        RuleForEach(x => x.Includes).NotEmpty().MaximumLength(300);
+    }
+}
+
 /// <summary>
 /// Holiday packages keep their data in tables; every other product type keeps its own fields as a JSON
 /// object on the package. This turns what the admin sends into that JSON (dropping anything unknown) and
@@ -110,6 +136,7 @@ public static class ProductDetails
             ProductType.Flight => Read(raw, new FlightDetailsValidator()),
             ProductType.HotelReservation => Read(raw, new HotelDetailsValidator()),
             ProductType.VisaSupport => Read(raw, new VisaDetailsValidator()),
+            ProductType.PrivateCharter => Read(raw, new CharterDetailsValidator()),
             _ => throw new AppException("Unknown product type."),
         };
         return JsonConvert.SerializeObject(details, Json);

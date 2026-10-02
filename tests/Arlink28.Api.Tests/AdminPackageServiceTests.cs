@@ -279,6 +279,20 @@ public sealed class AdminPackageServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task A_private_charter_tier_needs_a_name_and_what_it_includes()
+    {
+        await Assert.ThrowsAsync<AppException>(() => _service.CreateAsync(new CreatePackageRequest(
+            "ARLink28 Elite", _destinationId, "", 0, 0, 0, null, null, null, null, null, ProductType.PrivateCharter,
+            JObject.Parse("""{"tier":"Elite"}"""))));
+        var tier = await _service.CreateAsync(new CreatePackageRequest(
+            "ARLink28 Elite", _destinationId, "", 0, 0, 0, null, null, null, null, null, ProductType.PrivateCharter,
+            JObject.Parse("""{"tier":"Elite","includes":["Private aircraft charter","VIP ground transfer"],"unknown":1}""")));
+        Assert.Equal("PrivateCharter", tier.ProductType);
+        Assert.Equal(2, ((Newtonsoft.Json.Linq.JArray)tier.Details!["includes"]!).Count);
+        Assert.Null(tier.Details["unknown"]);
+    }
+
+    [Fact]
     public async Task The_admin_list_can_be_filtered_by_type()
     {
         await _service.CreateAsync(NewPackage());

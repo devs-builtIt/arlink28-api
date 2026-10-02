@@ -35,6 +35,7 @@ public class EnquiryNotifier(
                 ProductType.Flight => "flight enquiry",
                 ProductType.HotelReservation => "hotel reservation enquiry",
                 ProductType.VisaSupport => "visa support enquiry",
+                ProductType.PrivateCharter => "private charter enquiry",
                 _ => "package enquiry",
             },
             e.Name, e.Email, e.Phone, e.PackageTitle, e.CheckIn, e.Nights, TotalText(e), e.Subject, e.Message,

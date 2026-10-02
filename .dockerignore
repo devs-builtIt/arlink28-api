@@ -1,0 +1,10 @@
+# Keep the build context small and stop local build output overwriting the container's own.
+**/bin/
+**/obj/
+.git/
+.vs/
+.idea/
+local-storage/
+tests/
+docs/
+*.md

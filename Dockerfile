@@ -5,7 +5,8 @@ COPY ["Arlink28.Api.csproj", "./"]
 RUN dotnet restore
 
 COPY . .
-RUN dotnet publish -c Release -o /app/publish --no-restore
+# The repo root holds both the project and a solution file, so the project must be named.
+RUN dotnet publish "Arlink28.Api.csproj" -c Release -o /app/publish --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app

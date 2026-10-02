@@ -15,6 +15,6 @@ public record PackageListRequest(
     string? Sort = null,
     /// <summary>Matches part of the title, subtitle or summary.</summary>
     string? Q = null,
-    /// <summary>HolidayPackage (default), Flight, HotelReservation, VisaSupport, or "all".</summary>
+    /// <summary>HolidayPackage (default), Flight, HotelReservation, VisaSupport, PrivateCharter, or "all".</summary>
     string? Type = null
 );

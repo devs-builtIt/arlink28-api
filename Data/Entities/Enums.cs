@@ -1,7 +1,7 @@
 namespace Arlink28.Api.Data.Entities;
 
 /// <summary>What a catalogue entry sells. Everything shares one table; HolidayPackage is the original kind.</summary>
-public enum ProductType { HolidayPackage, Flight, HotelReservation, VisaSupport }
+public enum ProductType { HolidayPackage, Flight, HotelReservation, VisaSupport, PrivateCharter }
 
 public enum PackageStatus { Draft, Published, Archived }
 

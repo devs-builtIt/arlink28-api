@@ -8,7 +8,7 @@ Living documentation for the C# REST API backend. The frontend lives in `arlink2
 |----------|-------------|
 | [architecture.md](architecture.md) | Stack, feature folder layout, entity model, key patterns |
 | [auth-plan.md](auth-plan.md) | Phase 2 auth design — entities, endpoints, flows, security requirements |
-| [instructions.md](instructions.md) | Local dev setup, running the API, running migrations |
+| [instructions.md](instructions.md) | Local dev setup, running the API, running migrations, media storage providers |
 | [security.md](security.md) | Open findings, non-findings, what to audit per phase |
 | [memory.md](memory.md) | Running project log — decisions, gotchas, current state |
 | [adr/](adr/) | Architecture Decision Records |

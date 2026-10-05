@@ -42,3 +42,7 @@ The EF CLI (`dotnet ef database update`) connects, reads the migration history t
 - TypeScript client for `arlink28-nextjs` has not been generated from the OpenAPI spec.
 - `appsettings.Development.json` contains the real Supabase password — should be moved to dotnet user-secrets (see `docs/security.md`).
 - The `.migration-runner/` temp directory may still exist on disk (locked by a process during cleanup); it is in `.gitignore`.
+
+## 2026-10-05 — Supabase Storage provider for uploaded photos
+
+`SupabaseMediaStorage` (`Features/Shared/Services`) is selected by `MediaStorage:Provider=Supabase`; `LocalDiskMediaStorage` stays the default and is now registered explicitly in `Program.cs` (it no longer carries the `ISingleton` marker, which would have registered both). With Supabase on, `/media/{**path}` redirects to the public bucket instead of using `UseStaticFiles`. Reason: Render's container disk is wiped on every deploy. Written on a machine without the .NET 10 SDK, so Render's build was its first compile; no unit tests yet. `IMediaStorage.Delete` is synchronous, so the Supabase version blocks on the HTTP call (rare admin action). Staging setup: `arlink28-nextjs/docs/staging.md`.

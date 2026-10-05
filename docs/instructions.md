@@ -118,6 +118,19 @@ dotnet run --project Arlink28.Api.csproj -- seed-catalogue --today=2026-11-01 # 
 - Three packages are seeded as `Draft` because their posters contradict each other; the command prints each reason. They stay off the public API until someone confirms the numbers.
 - It's deliberately not run at startup: once packages are edited in the admin, a restart must not overwrite them.
 
+## Media storage
+
+Uploaded package photos are stored behind `IMediaStorage`; paths in the database are always `/media/<folder>/<name>`.
+
+| `MediaStorage:Provider` | Where files go | Use |
+|---|---|---|
+| `LocalDisk` (default) | `MediaStorage:RootPath` (`local-storage/media`), served as static files | local development |
+| `Supabase` | a **public** Supabase Storage bucket; `/media/*` answers 302 to the bucket | staging on Render (its disk is wiped on every deploy) |
+
+Supabase settings (environment variable form for Render): `MediaStorage__Provider=Supabase`, `MediaStorage__SupabaseUrl=https://<project-ref>.supabase.co`, `MediaStorage__SupabaseBucket=<bucket>` (case-sensitive), `MediaStorage__SupabaseServiceKey=<service_role key>`. The key is a secret: environment or user-secrets only, never `appsettings.json`. Staging notes: `arlink28-nextjs/docs/staging.md`.
+
+Moving existing local photos: upload `local-storage/media/**` to the bucket under the same relative paths and nothing in the database changes. Not covered by tests yet.
+
 ## Build and check
 
 ```bash

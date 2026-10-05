@@ -1,11 +1,10 @@
-using Arlink28.Api.Features.Shared.Interfaces;
 using Arlink28.Api.Features.Shared.Services.Interfaces;
 using Arlink28.Api.Helpers.Settings;
 using Microsoft.Extensions.Options;
 
 namespace Arlink28.Api.Features.Shared.Services;
 
-public class LocalDiskMediaStorage(IOptions<MediaStorageSettings> options, IWebHostEnvironment env) : IMediaStorage, ISingleton
+public class LocalDiskMediaStorage(IOptions<MediaStorageSettings> options, IWebHostEnvironment env) : IMediaStorage
 {
     private readonly MediaStorageSettings _settings = options.Value;
 

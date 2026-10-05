@@ -69,6 +69,15 @@ try
     builder.Services.Configure<MediaStorageSettings>(builder.Configuration.GetSection(MediaStorageSettings.Section));
     builder.Services.Configure<EnquirySettings>(builder.Configuration.GetSection(EnquirySettings.Section));
 
+    // Chosen by MediaStorage:Provider. Render's disk is wiped on every deploy, so staging uses Supabase.
+    var mediaProvider = builder.Configuration[$"{MediaStorageSettings.Section}:{nameof(MediaStorageSettings.Provider)}"];
+    if (string.Equals(mediaProvider, "Supabase", StringComparison.OrdinalIgnoreCase))
+        builder.Services.AddSingleton<IMediaStorage>(sp => new SupabaseMediaStorage(
+            sp.GetRequiredService<IOptions<MediaStorageSettings>>(),
+            new HttpClient { Timeout = TimeSpan.FromSeconds(30) }));
+    else
+        builder.Services.AddSingleton<IMediaStorage, LocalDiskMediaStorage>();
+
     builder.Services.AddHostedService<Arlink28.Api.Features.Enquiries.Services.EnquiryNotificationWorker>();
 
     builder.Services.AddScoped<IPasswordHasher<Staff>, PasswordHasher<Staff>>();
@@ -269,16 +278,30 @@ try
         ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
     });
 
-    // Uploaded photos (MediaStorage:RootPath) are public, like the catalogue that shows them.
+    // Uploaded photos are public, like the catalogue that shows them.
     var mediaSettings = app.Services.GetRequiredService<IOptions<MediaStorageSettings>>().Value;
-    var mediaRoot = Path.GetFullPath(mediaSettings.RootPath, app.Environment.ContentRootPath);
-    Directory.CreateDirectory(mediaRoot);
-    app.UseStaticFiles(new StaticFileOptions
+    if (app.Services.GetRequiredService<IMediaStorage>() is SupabaseMediaStorage supabaseMedia)
     {
-        FileProvider = new PhysicalFileProvider(mediaRoot),
-        RequestPath = mediaSettings.PublicPath,
-        OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable",
-    });
+        // The files live in the Supabase bucket; /media/... sends the browser there.
+        app.MapGet(mediaSettings.PublicPath + "/{**path}", (string path, HttpContext ctx) =>
+        {
+            var target = supabaseMedia.PublicUrlFor(path);
+            if (target is null) return Results.NotFound();
+            ctx.Response.Headers.CacheControl = "public,max-age=86400";
+            return Results.Redirect(target);
+        });
+    }
+    else
+    {
+        var mediaRoot = Path.GetFullPath(mediaSettings.RootPath, app.Environment.ContentRootPath);
+        Directory.CreateDirectory(mediaRoot);
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new PhysicalFileProvider(mediaRoot),
+            RequestPath = mediaSettings.PublicPath,
+            OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable",
+        });
+    }
 
     app.UseRouting();
     app.UseRateLimiter();

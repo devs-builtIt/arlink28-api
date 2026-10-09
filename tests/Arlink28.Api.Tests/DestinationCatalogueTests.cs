@@ -1,5 +1,6 @@
 using Arlink28.Api.Data;
 using Arlink28.Api.Data.Entities;
+using Arlink28.Api.Features.Catalogue.RequestModels;
 using Arlink28.Api.Features.Catalogue.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -111,5 +112,21 @@ public sealed class DestinationCatalogueTests : IDisposable
         await _db.SaveChangesAsync();
         Assert.Equal(1, (await _service.GetDestinationAsync("botswana"))!.PackageCount);
         Assert.Equal(1, (await _service.GetDestinationAsync("chobe-national-park"))!.PackageCount);
+    }
+
+    [Fact]
+    public async Task The_package_filter_by_a_country_includes_packages_in_its_places()
+    {
+        _db.Packages.Add(new Package
+        {
+            Id = Guid.NewGuid(), Slug = "chobe-safari", Title = "Chobe", Category = "SAFARI", BaseCurrency = "USD",
+            DestinationId = _chobe.Id, Status = PackageStatus.Published, Nights = 3, MinNights = 3, Adults = 2,
+        });
+        await _db.SaveChangesAsync();
+        PackageListRequest For(string slug) => new(slug, null, null, null, null, null);
+
+        Assert.Equal(["chobe-safari"], (await _service.ListPackagesAsync(For("botswana"))).Items.Select(i => i.Slug));
+        Assert.Equal(["chobe-safari"], (await _service.ListPackagesAsync(For("chobe-national-park"))).Items.Select(i => i.Slug));
+        Assert.Empty((await _service.ListPackagesAsync(For("egypt"))).Items);
     }
 }

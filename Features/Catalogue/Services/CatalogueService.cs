@@ -29,7 +29,9 @@ public class CatalogueService(ApplicationDbContext db) : ICatalogueService, ISco
         }
 
         if (!string.IsNullOrWhiteSpace(request.Destination))
-            query = query.Where(p => p.Destination.Slug == request.Destination);
+            // A country matches the packages in the places inside it, so its page can list them.
+            query = query.Where(p => p.Destination.Slug == request.Destination
+                                     || (p.Destination.Parent != null && p.Destination.Parent.Slug == request.Destination));
 
         if (!string.IsNullOrWhiteSpace(request.Partner))
             query = query.Where(p => p.Stays.Any(s => s.Property.Partner != null && s.Property.Partner.Slug == request.Partner));

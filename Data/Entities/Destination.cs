@@ -30,6 +30,8 @@ public class Destination : BaseAuditableEntity
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
     public int SortOrder { get; set; }
+    /// <summary>First time it went live. Once set, the slug is locked so shared links never break.</summary>
+    public DateTime? PublishedAt { get; set; }
 
     public ICollection<Destination> Places { get; set; } = [];
     public ICollection<DestinationAttraction> Attractions { get; set; } = [];

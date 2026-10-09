@@ -15,7 +15,11 @@ ALTER TABLE "Destinations"
     ADD COLUMN IF NOT EXISTS "HeroCredit"      varchar(250) NULL,
     ADD COLUMN IF NOT EXISTS "Latitude"        double precision NULL,
     ADD COLUMN IF NOT EXISTS "Longitude"       double precision NULL,
-    ADD COLUMN IF NOT EXISTS "SortOrder"       integer      NOT NULL DEFAULT 0;
+    ADD COLUMN IF NOT EXISTS "SortOrder"       integer      NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS "PublishedAt"     timestamp with time zone NULL;
+
+-- Destinations already live count as published since they were created.
+UPDATE "Destinations" SET "PublishedAt" = "CreatedAt" WHERE "Status" = 'Published' AND "PublishedAt" IS NULL;
 
 DO $$
 BEGIN

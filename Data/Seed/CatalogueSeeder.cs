@@ -92,7 +92,7 @@ public class CatalogueSeeder(ApplicationDbContext db, ILogger<CatalogueSeeder> l
             foreach (var d in CatalogueSeedData.Destinations)
             {
                 var row = await db.Destinations.FirstOrDefaultAsync(x => x.Slug == d.Slug, ct)
-                          ?? db.Destinations.Add(new Destination { Id = Guid.NewGuid(), Slug = d.Slug, Status = d.Status, CreatedAt = now }).Entity;
+                          ?? db.Destinations.Add(new Destination { Id = Guid.NewGuid(), Slug = d.Slug, Status = d.Status, CreatedAt = now, PublishedAt = d.Status == DestinationStatus.Published ? now : null }).Entity;
                 row.Name = d.Name;
                 row.Country = d.Country;
                 row.Kind = d.Parent is null ? DestinationKind.Country : DestinationKind.Place;

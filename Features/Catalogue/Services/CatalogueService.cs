@@ -159,13 +159,58 @@ public class CatalogueService(ApplicationDbContext db) : ICatalogueService, ISco
         );
     }
 
-    public async Task<IReadOnlyList<DestinationResponse>> ListDestinationsAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<DestinationResponse>> ListDestinationsAsync(
+        string? country = null, string? kind = null, CancellationToken ct = default)
     {
-        return await db.Destinations
-            .AsNoTracking()
-            .OrderBy(d => d.Name)
-            .Select(d => new DestinationResponse(d.Id, d.Slug, d.Name, d.Country))
+        var query = db.Destinations.AsNoTracking().Where(d => d.Status == DestinationStatus.Published);
+        if (!string.IsNullOrWhiteSpace(country))
+        {
+            var code = country.Trim().ToUpperInvariant();
+            query = query.Where(d => d.Country == code);
+        }
+        if (Enum.TryParse<DestinationKind>(kind, ignoreCase: true, out var parsedKind))
+            query = query.Where(d => d.Kind == parsedKind);
+
+        return await query
+            .OrderBy(d => d.SortOrder).ThenBy(d => d.Name)
+            .Select(d => new DestinationResponse(
+                d.Id, d.Slug, d.Name, d.Country,
+                d.Kind.ToString(), d.Parent == null ? null : d.Parent.Slug,
+                d.Tagline, d.Summary, d.HeroPath, d.HeroAlt, d.HeroCredit))
             .ToListAsync(ct);
+    }
+
+    public async Task<DestinationDetailResponse?> GetDestinationAsync(string slug, CancellationToken ct = default)
+    {
+        var d = await db.Destinations.AsNoTracking()
+            .Include(x => x.Parent)
+            .Include(x => x.Attractions)
+            .Include(x => x.Places.Where(p => p.Status == DestinationStatus.Published))
+            .FirstOrDefaultAsync(x => x.Slug == slug && x.Status == DestinationStatus.Published, ct);
+        if (d is null) return null;
+
+        // A country's page counts packages across the places inside it.
+        var ids = new List<Guid> { d.Id };
+        ids.AddRange(d.Places.Select(p => p.Id));
+        var packageCount = await db.Packages.CountAsync(
+            p => p.Status == PackageStatus.Published && ids.Contains(p.DestinationId), ct);
+
+        // A draft parent is not exposed: the page would link to something that 404s.
+        var parent = d.Parent is { Status: DestinationStatus.Published } par
+            ? new DestinationResponse(par.Id, par.Slug, par.Name, par.Country, par.Kind.ToString())
+            : null;
+
+        return new DestinationDetailResponse(
+            d.Id, d.Slug, d.Name, d.Country, d.Kind.ToString(), parent,
+            d.Tagline, d.Summary, d.Description, d.BestTimeToVisit,
+            d.HeroPath, d.HeroAlt, d.HeroCredit, d.Latitude, d.Longitude,
+            d.Places.OrderBy(p => p.SortOrder).ThenBy(p => p.Name)
+                .Select(p => new DestinationResponse(
+                    p.Id, p.Slug, p.Name, p.Country, p.Kind.ToString(), d.Slug,
+                    p.Tagline, p.Summary, p.HeroPath, p.HeroAlt, p.HeroCredit)).ToList(),
+            d.Attractions.OrderBy(a => a.SortOrder)
+                .Select(a => new AttractionResponse(a.Id, a.Name, a.Summary, a.PhotoPath, a.PhotoAlt, a.PhotoCredit, a.SortOrder)).ToList(),
+            packageCount);
     }
 
     public async Task<IReadOnlyList<PartnerResponse>> ListPartnersAsync(CancellationToken ct = default)

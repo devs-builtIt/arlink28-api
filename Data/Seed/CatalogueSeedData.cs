@@ -11,7 +11,8 @@ namespace Arlink28.Api.Data.Seed;
 // each other are DRAFT with a DataIssue; they stay off the public API until
 // someone confirms the numbers and publishes them.
 
-public record SeedDestination(string Slug, string Name, string Country);
+/// <summary>A destination. A null Parent makes it a country. New rows start as Status; a reseed never changes the status of an existing row.</summary>
+public record SeedDestination(string Slug, string Name, string Country, string? Parent = null, DestinationStatus Status = DestinationStatus.Published);
 public record SeedPartner(string Slug, string Name, string? Tagline);
 public record SeedProperty(string Slug, string Name, string Partner, string Destination);
 public record SeedSeason(string Slug, string Name, string Partner, (string Start, string End)[] Ranges);
@@ -51,10 +52,25 @@ public static class CatalogueSeedData
 
     public static readonly SeedDestination[] Destinations =
     [
-        new("nairobi", "Nairobi", "KE"),
-        new("masai-mara", "Masai Mara", "KE"),
-        new("samburu", "Samburu", "KE"),
-        new("accra", "Accra", "GH"),
+        new("kenya", "Kenya", "KE", Status: DestinationStatus.Draft),
+        new("ghana", "Ghana", "GH", Status: DestinationStatus.Draft),
+        new("zimbabwe", "Zimbabwe", "ZW", Status: DestinationStatus.Draft),
+        new("botswana", "Botswana", "BW", Status: DestinationStatus.Draft),
+        new("egypt", "Egypt", "EG", Status: DestinationStatus.Draft),
+        new("nairobi", "Nairobi", "KE", "kenya"),
+        new("masai-mara", "Masai Mara", "KE", "kenya"),
+        new("samburu", "Samburu", "KE", "kenya"),
+        new("accra", "Accra", "GH", "ghana"),
+        new("victoria-falls", "Victoria Falls", "ZW", "zimbabwe", DestinationStatus.Draft),
+        new("chobe-national-park", "Chobe National Park", "BW", "botswana", DestinationStatus.Draft),
+        new("okavango-delta", "Okavango Delta", "BW", "botswana", DestinationStatus.Draft),
+        new("moremi-game-reserve", "Moremi Game Reserve", "BW", "botswana", DestinationStatus.Draft),
+        new("makgadikgadi-pans", "Makgadikgadi Pans", "BW", "botswana", DestinationStatus.Draft),
+        new("giza", "Giza", "EG", "egypt", DestinationStatus.Draft),
+        new("luxor", "Luxor", "EG", "egypt", DestinationStatus.Draft),
+        new("aswan", "Aswan and Abu Simbel", "EG", "egypt", DestinationStatus.Draft),
+        new("red-sea", "Red Sea", "EG", "egypt", DestinationStatus.Draft),
+        new("cairo", "Cairo", "EG", "egypt", DestinationStatus.Draft),
     ];
 
     public static readonly SeedPartner[] Partners =

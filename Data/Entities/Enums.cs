@@ -22,3 +22,7 @@ public enum StaffTokenType { Invite, PasswordReset }
 public enum EnquiryType { Package, General, Booking, Partnership, Career, Investor }
 
 public enum EnquiryStatus { New, Contacted, Closed }
+
+public enum DestinationKind { Country, Place }
+
+public enum DestinationStatus { Draft, Published }

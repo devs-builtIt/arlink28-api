@@ -83,6 +83,7 @@ try
     builder.Services.AddScoped<IPasswordHasher<Staff>, PasswordHasher<Staff>>();
     builder.Services.AddScoped<DataContextInitializer>();
     builder.Services.AddScoped<CatalogueSeeder>();
+    builder.Services.AddScoped<DestinationContentSeeder>();
 
     // Scrutor: auto-register services by lifetime marker interface
     builder.Services.Scan(s =>
@@ -251,6 +252,39 @@ try
         var lines = args.Contains("--undo") ? await seeder.UndoAsync(dryRun) : await seeder.SeedAsync(count, dryRun);
         foreach (var line in lines) Console.WriteLine(line);
         Console.WriteLine(dryRun ? "Dry run: nothing was changed." : "Done.");
+        return;
+    }
+
+    // `dotnet run -- seed-destinations [--photos=<folder>] [--dry-run] [--allow-production]`
+    // fills the African destinations with their first write-ups and hero photos (see DestinationContentSeeder).
+    // It only fills what is empty, never publishes, and exits without starting the server.
+    if (args.Length > 0 && args[0] == "seed-destinations")
+    {
+        if (app.Environment.IsProduction() && !args.Contains("--allow-production"))
+        {
+            Console.Error.WriteLine("Refusing to seed destinations in Production without --allow-production.");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var dryRun = args.Contains("--dry-run");
+        var photosArg = args.FirstOrDefault(a => a.StartsWith("--photos="));
+        var photos = photosArg is null ? null : photosArg["--photos=".Length..].Trim('"');
+
+        using var destinationScope = app.Services.CreateScope();
+        try
+        {
+            var lines = await destinationScope.ServiceProvider.GetRequiredService<DestinationContentSeeder>()
+                .SeedAsync(photos, dryRun);
+            foreach (var line in lines) Console.WriteLine(line);
+            Console.WriteLine(dryRun ? "Dry run: nothing was changed." : "Done. Everything is still a draft: review it in the admin, then publish.");
+        }
+        catch (Exception ex) when (ex.ToString().Contains("42703") || ex.ToString().Contains("42P01"))
+        {
+            // Postgres: undefined column / undefined table.
+            Console.Error.WriteLine("The destinations tables are missing their new columns. Apply docs/migrations/004_destination_profiles.sql first.");
+            Environment.ExitCode = 1;
+        }
         return;
     }
 

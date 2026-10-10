@@ -18,6 +18,16 @@ public record PackageCount(Guid? PackageId, string Title, int Count);
 public record AwaitingEnquiry(
     Guid Id, string Reference, string Name, EnquiryType Type, string? PackageTitle, DateTime CreatedAt);
 
+public record DestinationCount(string Name, int Count);
+
+/// <param name="Handled">Enquiries in the period that this person has acted on.</param>
+/// <param name="Closed">Of those, how many are closed.</param>
+public record StaffWorkload(Guid Id, string Username, int Handled, int Closed);
+
+/// <summary>An enquiry with a check-in date still to come.</summary>
+public record UpcomingTrip(
+    Guid Id, string Reference, string Name, string? PackageTitle, DateOnly CheckIn, int? Nights, EnquiryStatus Status);
+
 /// <param name="Total">Enquiries received inside the period.</param>
 /// <param name="PreviousTotal">The same count for the period just before it, to compare against.</param>
 /// <param name="New">Of those received in the period, how many are still new.</param>
@@ -28,6 +38,10 @@ public record AwaitingEnquiry(
 /// <param name="Series">One entry per day of the period.</param>
 /// <param name="PreviousSeries">The previous period, shifted to line up day by day with Series.</param>
 /// <param name="ByWeekday">Enquiries by day of the week, Monday first.</param>
+/// <param name="ByDestination">Where the enquiries about a listing were for, busiest first.</param>
+/// <param name="Staff">Who has handled what, most first. Only staff who handled something.</param>
+/// <param name="Upcoming">The next trips by check-in date, whatever period is shown.</param>
+/// <param name="UpcomingNext30">How many enquiries have a check-in in the next 30 days.</param>
 public record EnquiryMetrics(
     int Total,
     int PreviousTotal,
@@ -43,7 +57,11 @@ public record EnquiryMetrics(
     IReadOnlyList<int> ByWeekday,
     IReadOnlyList<CurrencyTotal> Quoted,
     IReadOnlyList<PackageCount> TopPackages,
-    IReadOnlyList<AwaitingEnquiry> Awaiting);
+    IReadOnlyList<AwaitingEnquiry> Awaiting,
+    IReadOnlyList<DestinationCount> ByDestination,
+    IReadOnlyList<StaffWorkload> Staff,
+    IReadOnlyList<UpcomingTrip> Upcoming,
+    int UpcomingNext30);
 
 public record ProductStatusCount(string Product, int Published, int Draft, int Archived);
 

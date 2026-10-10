@@ -35,7 +35,9 @@ public class DashboardService(ApplicationDbContext db) : IDashboardService, ISco
             .Where(e => e.CreatedAt >= windowStart)
             .Select(e => new Row(e.Id, e.Type, e.Status, e.PackageId, e.PackageTitle,
                 e.Package != null ? e.Package.ProductType : (ProductType?)null,
-                e.QuotedTotalMinor, e.Currency, e.CreatedAt, e.UpdatedAt, e.HandledById))
+                e.QuotedTotalMinor, e.Currency, e.CreatedAt, e.UpdatedAt, e.HandledById,
+                e.Package != null ? e.Package.Destination.Name : null,
+                e.HandledBy != null ? e.HandledBy.Username : null))
             .ToListAsync(ct);
 
         var current = rows.Where(r => DateOnly.FromDateTime(r.CreatedAt) >= from).ToList();
@@ -47,6 +49,16 @@ public class DashboardService(ApplicationDbContext db) : IDashboardService, ISco
             .OrderBy(e => e.CreatedAt).Take(ListLength)
             .Select(e => new AwaitingEnquiry(e.Id, e.Reference, e.Name, e.Type, e.PackageTitle, e.CreatedAt))
             .ToListAsync(ct);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var upcoming = await db.Enquiries.AsNoTracking()
+            .Where(e => e.CheckIn != null && e.CheckIn >= today && e.Status != EnquiryStatus.Closed)
+            .OrderBy(e => e.CheckIn).ThenBy(e => e.CreatedAt).Take(ListLength)
+            .Select(e => new UpcomingTrip(e.Id, e.Reference, e.Name, e.PackageTitle, e.CheckIn!.Value, e.Nights, e.Status))
+            .ToListAsync(ct);
+        var inThirty = today.AddDays(30);
+        var upcomingNext30 = await db.Enquiries.CountAsync(
+            e => e.CheckIn != null && e.CheckIn >= today && e.CheckIn <= inThirty && e.Status != EnquiryStatus.Closed, ct);
 
         return new EnquiryMetrics(
             Total: current.Count,
@@ -70,7 +82,17 @@ public class DashboardService(ApplicationDbContext db) : IDashboardService, ISco
                 .GroupBy(r => new { r.PackageId, Title = r.PackageTitle! })
                 .OrderByDescending(g => g.Count()).ThenBy(g => g.Key.Title).Take(ListLength)
                 .Select(g => new PackageCount(g.Key.PackageId, g.Key.Title, g.Count())).ToList(),
-            Awaiting: awaiting);
+            Awaiting: awaiting,
+            ByDestination: current.Where(r => r.Destination is not null).GroupBy(r => r.Destination!)
+                .OrderByDescending(g => g.Count()).ThenBy(g => g.Key).Take(6)
+                .Select(g => new DestinationCount(g.Key, g.Count())).ToList(),
+            Staff: current.Where(r => r.HandledById is not null && r.Status != EnquiryStatus.New)
+                .GroupBy(r => new { Id = r.HandledById!.Value, Name = r.HandledByName ?? "Former staff" })
+                .OrderByDescending(g => g.Count()).ThenBy(g => g.Key.Name).Take(ListLength)
+                .Select(g => new StaffWorkload(g.Key.Id, g.Key.Name, g.Count(), g.Count(r => r.Status == EnquiryStatus.Closed)))
+                .ToList(),
+            Upcoming: upcoming,
+            UpcomingNext30: upcomingNext30);
     }
 
     /// <summary>
@@ -144,5 +166,5 @@ public class DashboardService(ApplicationDbContext db) : IDashboardService, ISco
     private record Row(
         Guid Id, EnquiryType Type, EnquiryStatus Status, Guid? PackageId, string? PackageTitle,
         ProductType? Product, long? QuotedMinor, string? Currency, DateTime CreatedAt, DateTime UpdatedAt,
-        Guid? HandledById);
+        Guid? HandledById, string? Destination, string? HandledByName);
 }

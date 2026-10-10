@@ -22,7 +22,8 @@ public sealed class DashboardServiceTests : IDisposable
 
     private Enquiry AddEnquiry(
         DateTime at, EnquiryStatus status = EnquiryStatus.New, EnquiryType type = EnquiryType.General,
-        Package? package = null, long? quoted = null, string? currency = null, TimeSpan? handledAfter = null)
+        Package? package = null, long? quoted = null, string? currency = null, TimeSpan? handledAfter = null,
+        Staff? handler = null, DateOnly? checkIn = null)
     {
         var enquiry = new Enquiry
         {
@@ -38,7 +39,9 @@ public sealed class DashboardServiceTests : IDisposable
             Currency = currency,
             CreatedAt = at,
             UpdatedAt = handledAfter is null ? at : at + handledAfter.Value,
-            HandledById = handledAfter is null ? null : Guid.NewGuid(),
+            HandledById = handler?.Id ?? (handledAfter is null ? null : Guid.NewGuid()),
+            CheckIn = checkIn,
+            Nights = checkIn is null ? null : 5,
         };
         _db.Enquiries.Add(enquiry);
         _db.SaveChanges();
@@ -183,6 +186,74 @@ public sealed class DashboardServiceTests : IDisposable
         Assert.Contains(result.ByProduct, p => p.Product == "General" && p.Count == 1);
         Assert.Equal(4, result.ByWeekday.Sum());
         Assert.Equal(7, result.ByWeekday.Count);
+    }
+
+    private Staff AddStaff(string username)
+    {
+        var staff = new Staff { Id = Guid.NewGuid(), Username = username, Email = $"{username}@example.com" };
+        _db.Staff.Add(staff);
+        _db.SaveChanges();
+        return staff;
+    }
+
+    [Fact]
+    public async Task Ranks_destinations_by_the_enquiries_about_their_listings()
+    {
+        var kenya = new Destination { Id = Guid.NewGuid(), Slug = "kenya", Name = "Kenya", Country = "KE" };
+        var ghana = new Destination { Id = Guid.NewGuid(), Slug = "ghana", Name = "Ghana", Country = "GH" };
+        _db.Destinations.AddRange(kenya, ghana);
+        await _db.SaveChangesAsync();
+        var safari = AddPackage("Safari");
+        safari.DestinationId = kenya.Id;
+        var beach = AddPackage("Beach");
+        beach.DestinationId = ghana.Id;
+        await _db.SaveChangesAsync();
+        AddEnquiry(DaysAgo(1), type: EnquiryType.Package, package: safari);
+        AddEnquiry(DaysAgo(2), type: EnquiryType.Package, package: safari);
+        AddEnquiry(DaysAgo(3), type: EnquiryType.Package, package: beach);
+        AddEnquiry(DaysAgo(4)); // general: no destination
+
+        var result = (await _service.GetAsync(30)).Enquiries;
+
+        Assert.Equal(("Kenya", 2), (result.ByDestination[0].Name, result.ByDestination[0].Count));
+        Assert.Equal(("Ghana", 1), (result.ByDestination[1].Name, result.ByDestination[1].Count));
+        Assert.Equal(2, result.ByDestination.Count);
+    }
+
+    [Fact]
+    public async Task Shows_who_handled_what_and_ignores_enquiries_nobody_acted_on()
+    {
+        var anna = AddStaff("anna");
+        var kwame = AddStaff("kwame");
+        AddEnquiry(DaysAgo(1), EnquiryStatus.Closed, handledAfter: TimeSpan.FromHours(2), handler: anna);
+        AddEnquiry(DaysAgo(2), EnquiryStatus.Contacted, handledAfter: TimeSpan.FromHours(2), handler: anna);
+        AddEnquiry(DaysAgo(3), EnquiryStatus.Contacted, handledAfter: TimeSpan.FromHours(2), handler: kwame);
+        AddEnquiry(DaysAgo(4)); // new, nobody has touched it
+
+        var result = (await _service.GetAsync(30)).Enquiries;
+
+        Assert.Equal(2, result.Staff.Count);
+        Assert.Equal(("anna", 2, 1), (result.Staff[0].Username, result.Staff[0].Handled, result.Staff[0].Closed));
+        Assert.Equal(("kwame", 1, 0), (result.Staff[1].Username, result.Staff[1].Handled, result.Staff[1].Closed));
+    }
+
+    [Fact]
+    public async Task Lists_the_next_trips_by_check_in_and_counts_those_in_the_next_thirty_days()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        AddEnquiry(DaysAgo(1), checkIn: today.AddDays(40));
+        var soonest = AddEnquiry(DaysAgo(2), checkIn: today.AddDays(5));
+        AddEnquiry(DaysAgo(3), checkIn: today.AddDays(20));
+        AddEnquiry(DaysAgo(4), checkIn: today.AddDays(-3)); // already gone
+        AddEnquiry(DaysAgo(5), EnquiryStatus.Closed, handledAfter: TimeSpan.FromHours(1), checkIn: today.AddDays(2)); // closed
+        AddEnquiry(DaysAgo(6)); // no date
+
+        var result = (await _service.GetAsync(30)).Enquiries;
+
+        Assert.Equal(3, result.Upcoming.Count);
+        Assert.Equal(soonest.Id, result.Upcoming[0].Id);
+        Assert.Equal(result.Upcoming.OrderBy(t => t.CheckIn).Select(t => t.Id), result.Upcoming.Select(t => t.Id));
+        Assert.Equal(2, result.UpcomingNext30);
     }
 
     [Fact]

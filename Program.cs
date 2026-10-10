@@ -84,6 +84,7 @@ try
     builder.Services.AddScoped<DataContextInitializer>();
     builder.Services.AddScoped<CatalogueSeeder>();
     builder.Services.AddScoped<DestinationContentSeeder>();
+    builder.Services.AddScoped<ProductSeeder>();
 
     // Scrutor: auto-register services by lifetime marker interface
     builder.Services.Scan(s =>
@@ -222,6 +223,27 @@ try
         foreach (var r in results)
             Console.WriteLine($"{r.Action,-8} {r.Status,-10} {r.Slug}{(r.DataIssue is null ? "" : "  (draft: " + r.DataIssue + ")")}");
         Console.WriteLine($"Seeded {results.Count} packages (from-prices as of {today:yyyy-MM-dd}).");
+        return;
+    }
+
+    // `dotnet run -- seed-products [--dry-run] [--undo] [--allow-production]`
+    // adds sample flight, hotel and visa listings (see ProductSeeder). Create-only; --undo removes exactly
+    // those slugs. Exits without starting the server.
+    if (args.Length > 0 && args[0] == "seed-products")
+    {
+        if (app.Environment.IsProduction() && !args.Contains("--allow-production"))
+        {
+            Console.Error.WriteLine("Refusing to add sample listings in Production without --allow-production.");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var dryRun = args.Contains("--dry-run");
+        using var productScope = app.Services.CreateScope();
+        var productSeeder = productScope.ServiceProvider.GetRequiredService<ProductSeeder>();
+        var lines = args.Contains("--undo") ? await productSeeder.UndoAsync(dryRun) : await productSeeder.SeedAsync(dryRun);
+        foreach (var line in lines) Console.WriteLine(line);
+        Console.WriteLine(dryRun ? "Dry run: nothing was changed." : "Done.");
         return;
     }
 

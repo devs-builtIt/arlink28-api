@@ -28,7 +28,7 @@ public class DashboardService(ApplicationDbContext db) : IDashboardService, ISco
 
     private async Task<EnquiryMetrics> EnquiryMetricsAsync(DateOnly from, DateOnly previousFrom, int days, CancellationToken ct)
     {
-        var windowStart = previousFrom.ToDateTime(TimeOnly.MinValue);
+        var windowStart = previousFrom.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
 
         // Two periods' worth of enquiries is small, so the grouping is done here rather than in SQL.
         var rows = await db.Enquiries.AsNoTracking()

@@ -202,6 +202,21 @@ try
 
     var app = builder.Build();
 
+    // `dotnet Arlink28.Api.dll migrate` applies pending EF Core migrations and exits without starting
+    // the server. Deploys run it as a one-off step before the API starts; the API never migrates on boot.
+    if (args.Length > 0 && args[0] == "migrate")
+    {
+        using var migrateScope = app.Services.CreateScope();
+        var migrateDb = migrateScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var pending = (await migrateDb.Database.GetPendingMigrationsAsync()).ToList();
+        Console.WriteLine(pending.Count == 0
+            ? "No pending migrations."
+            : "Applying: " + string.Join(", ", pending));
+        await migrateDb.Database.MigrateAsync();
+        Console.WriteLine("Database is up to date.");
+        return;
+    }
+
     // `dotnet run -- seed-catalogue [--today=YYYY-MM-DD] [--allow-production]`
     // loads the poster catalogue (Data/Seed) and exits without starting the server.
     if (args.Length > 0 && args[0] == "seed-catalogue")

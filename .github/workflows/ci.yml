@@ -52,6 +52,7 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - run: dotnet tool install --global dotnet-ef --version 10.0.7
+      - run: dotnet restore Arlink28.Api.csproj
       - name: Model matches the migrations
         run: dotnet ef migrations has-pending-model-changes
       - name: Apply every migration to an empty database

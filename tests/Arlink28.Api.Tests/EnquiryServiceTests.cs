@@ -53,10 +53,17 @@ public sealed class EnquiryServiceTests : IDisposable
     private readonly FakeMedia _media = new();
     private readonly EnquiryNotifier _notifier;
 
-    private EnquiryNotifier NewNotifier(string notifyTo) => new(
+    private EnquiryNotifier NewNotifier(string notifyTo) => NewNotifier(new EnquirySettings { NotifyTo = notifyTo });
+
+    private EnquiryNotifier NewNotifier(EnquirySettings settings) => new(
         _db, _mail, _media,
-        Options.Create(new EnquirySettings { NotifyTo = notifyTo }),
+        Options.Create(settings),
         Options.Create(new AppSettings { FrontendBaseUrl = "https://www.example.com/" }));
+
+    private static EnquirySettings Routed(string notifyTo = "") => new()
+    {
+        NotifyTo = notifyTo, ReservationsTo = "reservations@example.com", ContactTo = "info@example.com",
+    };
 
     /// <summary>Sends the email for the newest queued enquiry, as the background worker would.</summary>
     private Task Announce(EnquiryNotifier? notifier = null) => (notifier ?? _notifier).SendAsync(_queue.Ids.Last());
@@ -188,6 +195,52 @@ public sealed class EnquiryServiceTests : IDisposable
 
         Assert.Empty(_mail.Sent);
         Assert.Equal(1, await _db.Enquiries.CountAsync());
+    }
+
+    [Fact]
+    public async Task A_package_enquiry_also_goes_to_reservations_and_not_to_the_contact_inbox()
+    {
+        await _service.CreateAsync(ForPackage());
+
+        await Announce(NewNotifier(Routed(notifyTo: "staff@example.com")));
+
+        var (to, _) = Assert.Single(_mail.Sent);
+        Assert.Equal("staff@example.com, reservations@example.com", to);
+    }
+
+    [Fact]
+    public async Task A_booking_help_enquiry_goes_to_reservations()
+    {
+        await _service.CreateAsync(General() with { Type = EnquiryType.Booking });
+
+        await Announce(NewNotifier(Routed()));
+
+        Assert.Equal("reservations@example.com", Assert.Single(_mail.Sent).To);
+    }
+
+    [Theory]
+    [InlineData(EnquiryType.General)]
+    [InlineData(EnquiryType.Partnership)]
+    [InlineData(EnquiryType.Career)]
+    [InlineData(EnquiryType.Investor)]
+    public async Task The_general_contact_form_also_goes_to_the_contact_inbox_and_is_saved(EnquiryType type)
+    {
+        await _service.CreateAsync(General() with { Type = type });
+
+        await Announce(NewNotifier(Routed(notifyTo: "staff@example.com")));
+
+        Assert.Equal("staff@example.com, info@example.com", Assert.Single(_mail.Sent).To);
+        Assert.Equal(type, (await _db.Enquiries.SingleAsync()).Type);
+    }
+
+    [Fact]
+    public async Task An_address_listed_twice_is_only_emailed_once()
+    {
+        await _service.CreateAsync(ForPackage());
+
+        await Announce(NewNotifier(Routed(notifyTo: "Reservations@example.com; staff@example.com")));
+
+        Assert.Equal("Reservations@example.com, staff@example.com", Assert.Single(_mail.Sent).To);
     }
 
     [Fact]

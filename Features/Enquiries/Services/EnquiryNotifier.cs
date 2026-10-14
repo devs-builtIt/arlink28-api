@@ -21,11 +21,13 @@ public class EnquiryNotifier(
 
     public async Task SendAsync(Guid enquiryId, CancellationToken ct = default)
     {
-        var to = settings.Value.NotifyTo;
-        if (string.IsNullOrWhiteSpace(to)) return;
-
         var e = await db.Enquiries.AsNoTracking().FirstOrDefaultAsync(x => x.Id == enquiryId, ct);
         if (e is null) return;
+
+        // Who is told depends on what the enquiry is about; see EnquirySettings. The enquiry itself is
+        // already saved, so nobody to tell just means no email.
+        var to = settings.Value.RecipientsFor(e.Type);
+        if (string.IsNullOrWhiteSpace(to)) return;
 
         var (destination, party, photo, productType) = await PackageDetailsAsync(e, ct);
         var notice = new EnquiryNotice(

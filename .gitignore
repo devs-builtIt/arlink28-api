@@ -23,7 +23,6 @@ logs/
 *.log
 
 ## EF Core temp
-Migrations/
 # ...but docs/migrations holds the project's reviewed SQL scripts, which are kept.
 !docs/migrations/
 

@@ -92,12 +92,15 @@ public class CatalogueSeeder(ApplicationDbContext db, ILogger<CatalogueSeeder> l
             foreach (var d in CatalogueSeedData.Destinations)
             {
                 var row = await db.Destinations.FirstOrDefaultAsync(x => x.Slug == d.Slug, ct)
-                          ?? db.Destinations.Add(new Destination { Id = Guid.NewGuid(), Slug = d.Slug, CreatedAt = now }).Entity;
+                          ?? db.Destinations.Add(new Destination { Id = Guid.NewGuid(), Slug = d.Slug, Status = d.Status, CreatedAt = now, PublishedAt = d.Status == DestinationStatus.Published ? now : null }).Entity;
                 row.Name = d.Name;
                 row.Country = d.Country;
+                row.Kind = d.Parent is null ? DestinationKind.Country : DestinationKind.Place;
                 row.UpdatedAt = now;
                 destinations[d.Slug] = row;
             }
+            foreach (var d in CatalogueSeedData.Destinations)
+                destinations[d.Slug].Parent = d.Parent is null ? null : destinations[d.Parent];
 
             var partners = new Dictionary<string, Partner>();
             foreach (var p in CatalogueSeedData.Partners)

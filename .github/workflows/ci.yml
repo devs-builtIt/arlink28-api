@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore arlink28-api.slnx
+      - run: dotnet build arlink28-api.slnx --no-restore -c Release
+      - run: dotnet test arlink28-api.slnx --no-build -c Release
+
+  migrations:
+    # A fresh database must build from the migrations alone, and the model must not have drifted
+    # from them. Staging and production both depend on this.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: arlink28_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MIGRATION_CONNECTION: Host=localhost;Port=5432;Database=arlink28_ci;Username=postgres;Password=ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet tool install --global dotnet-ef --version 10.0.7
+      - run: dotnet restore Arlink28.Api.csproj
+      - name: Model matches the migrations
+        run: dotnet ef migrations has-pending-model-changes
+      - name: Apply every migration to an empty database
+        run: dotnet ef database update
+      - name: Applying again is a no-op
+        run: dotnet ef database update
+
+  docker:
+    # The production image must build, and must start as the non-root user.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t arlink28-api:ci .
+      - name: Runs as a non-root user
+        run: |
+          uid=$(docker run --rm --entrypoint id arlink28-api:ci -u)
+          echo "uid=$uid"
+          test "$uid" != "0"

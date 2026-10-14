@@ -19,6 +19,11 @@ public class ExceptionHandlingMiddleware(
         {
             await next(context);
         }
+        catch (ConflictException ex)
+        {
+            logger.LogWarning(ex, "Conflict: {Message}", ex.Message);
+            await WriteProblem(context, StatusCodes.Status409Conflict, ex.Message, ErrorCodes.Conflict);
+        }
         catch (AppException ex)
         {
             logger.LogWarning(ex, "Application exception: {Message}", ex.Message);

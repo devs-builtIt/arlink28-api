@@ -8,6 +8,7 @@ public class ApplicationDbContext : DbContext
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
     public virtual DbSet<Destination> Destinations { get; set; }
+    public virtual DbSet<DestinationAttraction> DestinationAttractions { get; set; }
     public virtual DbSet<Partner> Partners { get; set; }
     public virtual DbSet<Property> Properties { get; set; }
     public virtual DbSet<Package> Packages { get; set; }

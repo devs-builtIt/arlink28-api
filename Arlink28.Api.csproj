@@ -16,6 +16,8 @@
   <ItemGroup>
     <!-- The mark shown at the top of emails, sent inside the message so it needs no public web address. -->
     <EmbeddedResource Include="Features\Shared\Assets\email-logo.png" LogicalName="Arlink28.Api.Assets.email-logo.png" />
+    <!-- The first write-ups for the African destinations, loaded by the seed-destinations command. -->
+    <EmbeddedResource Include="Data\Seed\destination-content.json" LogicalName="Arlink28.Api.Data.Seed.destination-content.json" />
   </ItemGroup>
 
   <ItemGroup>

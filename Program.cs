@@ -83,6 +83,8 @@ try
     builder.Services.AddScoped<IPasswordHasher<Staff>, PasswordHasher<Staff>>();
     builder.Services.AddScoped<DataContextInitializer>();
     builder.Services.AddScoped<CatalogueSeeder>();
+    builder.Services.AddScoped<DestinationContentSeeder>();
+    builder.Services.AddScoped<ProductSeeder>();
 
     // Scrutor: auto-register services by lifetime marker interface
     builder.Services.Scan(s =>
@@ -200,6 +202,21 @@ try
 
     var app = builder.Build();
 
+    // `dotnet Arlink28.Api.dll migrate` applies pending EF Core migrations and exits without starting
+    // the server. Deploys run it as a one-off step before the API starts; the API never migrates on boot.
+    if (args.Length > 0 && args[0] == "migrate")
+    {
+        using var migrateScope = app.Services.CreateScope();
+        var migrateDb = migrateScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var pending = (await migrateDb.Database.GetPendingMigrationsAsync()).ToList();
+        Console.WriteLine(pending.Count == 0
+            ? "No pending migrations."
+            : "Applying: " + string.Join(", ", pending));
+        await migrateDb.Database.MigrateAsync();
+        Console.WriteLine("Database is up to date.");
+        return;
+    }
+
     // `dotnet run -- seed-catalogue [--today=YYYY-MM-DD] [--allow-production]`
     // loads the poster catalogue (Data/Seed) and exits without starting the server.
     if (args.Length > 0 && args[0] == "seed-catalogue")
@@ -221,6 +238,27 @@ try
         foreach (var r in results)
             Console.WriteLine($"{r.Action,-8} {r.Status,-10} {r.Slug}{(r.DataIssue is null ? "" : "  (draft: " + r.DataIssue + ")")}");
         Console.WriteLine($"Seeded {results.Count} packages (from-prices as of {today:yyyy-MM-dd}).");
+        return;
+    }
+
+    // `dotnet run -- seed-products [--dry-run] [--undo] [--allow-production]`
+    // adds sample flight, hotel and visa listings (see ProductSeeder). Create-only; --undo removes exactly
+    // those slugs. Exits without starting the server.
+    if (args.Length > 0 && args[0] == "seed-products")
+    {
+        if (app.Environment.IsProduction() && !args.Contains("--allow-production"))
+        {
+            Console.Error.WriteLine("Refusing to add sample listings in Production without --allow-production.");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var dryRun = args.Contains("--dry-run");
+        using var productScope = app.Services.CreateScope();
+        var productSeeder = productScope.ServiceProvider.GetRequiredService<ProductSeeder>();
+        var lines = args.Contains("--undo") ? await productSeeder.UndoAsync(dryRun) : await productSeeder.SeedAsync(dryRun);
+        foreach (var line in lines) Console.WriteLine(line);
+        Console.WriteLine(dryRun ? "Dry run: nothing was changed." : "Done.");
         return;
     }
 
@@ -254,6 +292,39 @@ try
         return;
     }
 
+    // `dotnet run -- seed-destinations [--photos=<folder>] [--dry-run] [--allow-production]`
+    // fills the African destinations with their first write-ups and hero photos (see DestinationContentSeeder).
+    // It only fills what is empty, never publishes, and exits without starting the server.
+    if (args.Length > 0 && args[0] == "seed-destinations")
+    {
+        if (app.Environment.IsProduction() && !args.Contains("--allow-production"))
+        {
+            Console.Error.WriteLine("Refusing to seed destinations in Production without --allow-production.");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var dryRun = args.Contains("--dry-run");
+        var photosArg = args.FirstOrDefault(a => a.StartsWith("--photos="));
+        var photos = photosArg is null ? null : photosArg["--photos=".Length..].Trim('"');
+
+        using var destinationScope = app.Services.CreateScope();
+        try
+        {
+            var lines = await destinationScope.ServiceProvider.GetRequiredService<DestinationContentSeeder>()
+                .SeedAsync(photos, dryRun);
+            foreach (var line in lines) Console.WriteLine(line);
+            Console.WriteLine(dryRun ? "Dry run: nothing was changed." : "Done. Everything is still a draft: review it in the admin, then publish.");
+        }
+        catch (Exception ex) when (ex.ToString().Contains("42703") || ex.ToString().Contains("42P01"))
+        {
+            // Postgres: undefined column / undefined table.
+            Console.Error.WriteLine("The destinations tables are missing their new columns. Apply docs/migrations/004_destination_profiles.sql first.");
+            Environment.ExitCode = 1;
+        }
+        return;
+    }
+
     using (var scope = app.Services.CreateScope())
     {
         var initialiser = scope.ServiceProvider.GetRequiredService<DataContextInitializer>();
@@ -273,10 +344,16 @@ try
 
     app.UseCors("CorsPolicy");
 
-    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    // The API always sits behind a reverse proxy (Caddy on the VPS, Render's edge on staging) and its
+    // port is never published, so trust the forwarded headers from whichever address the proxy has.
+    // Without this the rate limiter sees every visitor as the proxy's address and they share one bucket.
+    var forwardedHeaders = new ForwardedHeadersOptions
     {
         ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-    });
+    };
+    forwardedHeaders.KnownIPNetworks.Clear();
+    forwardedHeaders.KnownProxies.Clear();
+    app.UseForwardedHeaders(forwardedHeaders);
 
     // Uploaded photos are public, like the catalogue that shows them.
     var mediaSettings = app.Services.GetRequiredService<IOptions<MediaStorageSettings>>().Value;

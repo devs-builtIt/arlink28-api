@@ -202,6 +202,21 @@ try
 
     var app = builder.Build();
 
+    // `dotnet Arlink28.Api.dll migrate` applies pending EF Core migrations and exits without starting
+    // the server. Deploys run it as a one-off step before the API starts; the API never migrates on boot.
+    if (args.Length > 0 && args[0] == "migrate")
+    {
+        using var migrateScope = app.Services.CreateScope();
+        var migrateDb = migrateScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var pending = (await migrateDb.Database.GetPendingMigrationsAsync()).ToList();
+        Console.WriteLine(pending.Count == 0
+            ? "No pending migrations."
+            : "Applying: " + string.Join(", ", pending));
+        await migrateDb.Database.MigrateAsync();
+        Console.WriteLine("Database is up to date.");
+        return;
+    }
+
     // `dotnet run -- seed-catalogue [--today=YYYY-MM-DD] [--allow-production]`
     // loads the poster catalogue (Data/Seed) and exits without starting the server.
     if (args.Length > 0 && args[0] == "seed-catalogue")
@@ -329,10 +344,16 @@ try
 
     app.UseCors("CorsPolicy");
 
-    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    // The API always sits behind a reverse proxy (Caddy on the VPS, Render's edge on staging) and its
+    // port is never published, so trust the forwarded headers from whichever address the proxy has.
+    // Without this the rate limiter sees every visitor as the proxy's address and they share one bucket.
+    var forwardedHeaders = new ForwardedHeadersOptions
     {
         ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-    });
+    };
+    forwardedHeaders.KnownIPNetworks.Clear();
+    forwardedHeaders.KnownProxies.Clear();
+    app.UseForwardedHeaders(forwardedHeaders);
 
     // Uploaded photos are public, like the catalogue that shows them.
     var mediaSettings = app.Services.GetRequiredService<IOptions<MediaStorageSettings>>().Value;

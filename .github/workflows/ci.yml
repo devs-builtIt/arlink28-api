@@ -58,3 +58,16 @@ jobs:
         run: dotnet ef database update
       - name: Applying again is a no-op
         run: dotnet ef database update
+
+  docker:
+    # The production image must build, and must start as the non-root user.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t arlink28-api:ci .
+      - name: Runs as a non-root user
+        run: |
+          uid=$(docker run --rm --entrypoint id arlink28-api:ci -u)
+          echo "uid=$uid"
+          test "$uid" != "0"

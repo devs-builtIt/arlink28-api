@@ -344,10 +344,16 @@ try
 
     app.UseCors("CorsPolicy");
 
-    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    // The API always sits behind a reverse proxy (Caddy on the VPS, Render's edge on staging) and its
+    // port is never published, so trust the forwarded headers from whichever address the proxy has.
+    // Without this the rate limiter sees every visitor as the proxy's address and they share one bucket.
+    var forwardedHeaders = new ForwardedHeadersOptions
     {
         ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-    });
+    };
+    forwardedHeaders.KnownIPNetworks.Clear();
+    forwardedHeaders.KnownProxies.Clear();
+    app.UseForwardedHeaders(forwardedHeaders);
 
     // Uploaded photos are public, like the catalogue that shows them.
     var mediaSettings = app.Services.GetRequiredService<IOptions<MediaStorageSettings>>().Value;

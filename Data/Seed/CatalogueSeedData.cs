@@ -44,7 +44,9 @@ public record SeedPackage(
     SeedAddOn[] AddOns,
     string[] Sources,
     string? HeroImage = null,
-    string? DataIssue = null);
+    string? DataIssue = null,
+    /// <summary>Show on the home page and first in the listings. A reseed turns it on but never off.</summary>
+    bool Featured = false);
 
 public static class CatalogueSeedData
 {
@@ -267,6 +269,29 @@ public static class CatalogueSeedData
         [FeatureSection.Excluded] = GmExcluded,
     };
 
+    // The conditions from the 2026-10-08 "Giraffe Manor Package Notes" sheet, shared by the six flyer packages.
+    private static readonly FeatureRef[] GmNotes =
+    [
+        T("Check-in is from 12 noon and check-out is by 10:00 a.m."),
+        T("An early arrival or a late departure may need Retreat access booked separately, subject to availability."),
+        T("Arrival and departure transfers are included when the arrival collection is after 11:30 a.m. and the departure transfer is before the 10:00 a.m. check-out."),
+        T("Children aged 3 to 11 are classed as children, guests aged 12 and over as adults, and infants aged 0 to 2 stay free. Child sharing and extra bed arrangements are confirmed with the booking where they apply."),
+    ];
+
+    private static Dictionary<FeatureSection, FeatureRef[]> GmFeaturesNoted(params FeatureRef[] extraNotes) => new()
+    {
+        [FeatureSection.Included] = GmIncluded,
+        [FeatureSection.PremiumService] = GmPremium,
+        [FeatureSection.Excluded] = GmExcluded,
+        [FeatureSection.Note] = [.. GmNotes, .. extraNotes],
+    };
+
+    private static readonly SeedAddOn GmParkDrive = new(
+        "Private Nairobi National Park vehicle",
+        "Exclusive use of a vehicle for up to 6 guests, with the park entrance fees included. It cannot be combined with the arrival or departure transfer.",
+        AddOnUnit.PerStay,
+        49_000);
+
     private static Dictionary<FeatureSection, FeatureRef[]> SalaFeatures(int nights, string name, string party) => new()
     {
         [FeatureSection.Included] = SalaIncluded(nights),
@@ -361,13 +386,61 @@ public static class CatalogueSeedData
             ["WhatsApp Image 2026-09-25 at 02.19.34.jpeg", "WhatsApp Image 2026-09-25 at 02.19.34 (1).jpeg"]),
 
         // ---- Giraffe Manor, Nairobi ---------------------------------------------
+        // The six packages on the 2026-10-08 flyers (the "Giraffe Manor" folder). The older Giraffe Manor posters
+        // below are kept as they were; seed these six alone with `seed-catalogue --only=...`.
+        new("giraffe-manor-solo-escape", PackageStatus.Published, "Giraffe Manor Solo Escape",
+            "3 Nights / 4 Days for One Adult",
+            "An intimate, fully inclusive Giraffe Manor stay with meals, selected house drinks, Giraffe Centre access and qualifying transfers.",
+            "LODGE", "nairobi", 3, 3, 1, 0, 100,
+            [new("giraffe-manor", 3, "Superior Single Room")], GmFeaturesNoted(),
+            [new(Gm2026, 698_670)], [GmParkDrive],
+            ["WhatsApp Image 2026-10-08 at 15.36.45.jpeg", "WhatsApp Image 2026-10-08 at 15.36.46 (1).jpeg"],
+            HeroImage: Hero("gm-solo-escape.jpg"), Featured: true),
+
         new("giraffe-manor-signature-escape", PackageStatus.Published, "Giraffe Manor Signature Escape",
-            "2 Nights / 3 Days for Two Adults", GmElegance,
-            "LODGE", "nairobi", 2, 2, 2, 0, 110,
-            [new("giraffe-manor", 2)], GmFeatures(),
-            [new(Gm2026, 589_600)], [],
-            ["WhatsApp Image 2026-09-25 at 02.19.35 (3).jpeg"],
-            HeroImage: Hero("giraffe-manor-signature-escape.jpg")),
+            "5 Nights / 6 Days for Two Adults",
+            "A fully inclusive stay for two with meals, selected house drinks, Giraffe Centre access and qualifying transfers.",
+            "LODGE", "nairobi", 5, 5, 2, 0, 110,
+            [new("giraffe-manor", 5, "Superior Room")], GmFeaturesNoted(),
+            [new(Gm2026, 1_413_000)], [GmParkDrive],
+            ["WhatsApp Image 2026-10-08 at 15.36.45 (1).jpeg", "WhatsApp Image 2026-10-08 at 15.36.46 (1).jpeg"],
+            HeroImage: Hero("gm-signature-escape.jpg"), Featured: true),
+
+        new("giraffe-manor-family-experience", PackageStatus.Published, "Giraffe Manor Family Experience",
+            "5 Nights / 6 Days for Two Adults + Up to Two Children",
+            "A family stay in a two-bedroom suite with the Giraffe Manor fully inclusive experience.",
+            "LODGE", "nairobi", 5, 5, 2, 2, 120,
+            [new("giraffe-manor", 5, "Karen Blixen / Finch Hatton Suite")], GmFeaturesNoted(),
+            [new(Gm2026, 2_657_600)], [GmParkDrive],
+            ["WhatsApp Image 2026-10-08 at 15.36.45 (2).jpeg", "WhatsApp Image 2026-10-08 at 15.36.46 (1).jpeg"],
+            HeroImage: Hero("gm-family-experience.jpg"), Featured: true),
+
+        new("giraffe-manor-extended-family-package", PackageStatus.Published, "Giraffe Manor Extended Family Package",
+            "5 Nights / 6 Days for Two Adults + Three Children",
+            "A family suite experience for a larger family, with a third child charged in addition to the suite minimum.",
+            "LODGE", "nairobi", 5, 5, 2, 3, 130,
+            [new("giraffe-manor", 5, "Karen Blixen / Finch Hatton Suites")], GmFeaturesNoted(T("A third child is charged in addition to the suite minimum.")),
+            [new(Gm2026, 2_863_350)], [GmParkDrive],
+            ["WhatsApp Image 2026-10-08 at 15.36.45 (3).jpeg", "WhatsApp Image 2026-10-08 at 15.36.46 (1).jpeg"],
+            HeroImage: Hero("gm-extended-family.jpg"), Featured: true),
+
+        new("giraffe-manor-family-and-friends-retreat-3-adults", PackageStatus.Published, "Giraffe Manor Family and Friends Retreat (3 Adults)",
+            "7 Nights / 8 Days for Three Adults",
+            "A shared two-bedroom suite stay for three adults with the Giraffe Manor fully inclusive experience.",
+            "LODGE", "nairobi", 7, 7, 3, 0, 140,
+            [new("giraffe-manor", 7, "Karen Blixen / Finch Hatton Suites")], GmFeaturesNoted(),
+            [new(Gm2026, 3_720_640)], [GmParkDrive],
+            ["WhatsApp Image 2026-10-08 at 15.36.45 (4).jpeg", "WhatsApp Image 2026-10-08 at 15.36.46 (1).jpeg"],
+            HeroImage: Hero("gm-family-friends-3.jpg"), Featured: true),
+
+        new("giraffe-manor-family-and-friends-retreat-4-adults", PackageStatus.Published, "Giraffe Manor Family and Friends Retreat (4 Adults)",
+            "7 Nights / 8 Days for Four Adults",
+            "A shared two-bedroom suite stay for four adults with the Giraffe Manor fully inclusive experience.",
+            "LODGE", "nairobi", 7, 7, 4, 0, 150,
+            [new("giraffe-manor", 7, "Karen Blixen / Finch Hatton Suite")], GmFeaturesNoted(),
+            [new(Gm2026, 4_154_220)], [GmParkDrive],
+            ["WhatsApp Image 2026-10-08 at 15.36.46.jpeg", "WhatsApp Image 2026-10-08 at 15.36.46 (1).jpeg"],
+            HeroImage: Hero("gm-family-friends-4.jpg"), Featured: true),
 
         new("giraffe-manor-grand-escape", PackageStatus.Published, "Giraffe Manor Grand Escape",
             "3 Nights / 4 Days for Two Adults", GmElegance,
@@ -385,15 +458,6 @@ public static class CatalogueSeedData
             [new(Gm2026, 1_136_800)], [],
             ["WhatsApp Image 2026-09-25 at 02.19.35.jpeg"],
             HeroImage: Hero("giraffe-manor-luxury-escape.jpg")),
-
-        new("giraffe-manor-family-experience", PackageStatus.Published, "Giraffe Manor Family Experience",
-            "2 Nights / 3 Days for Two Adults + Two Children",
-            "Create timeless moments together, surrounded by elegance, heritage and the gentle giants of Giraffe Manor.",
-            "LODGE", "nairobi", 2, 2, 2, 2, 140,
-            [new("giraffe-manor", 2)], GmFeatures(),
-            [new(Gm2026, 968_500)], [],
-            ["WhatsApp Image 2026-09-25 at 02.19.35 (1).jpeg"],
-            HeroImage: Hero("giraffe-manor-family-experience.jpg")),
 
         new("giraffe-manor-family-celebration", PackageStatus.Published, "Giraffe Manor Family Celebration",
             "3 Nights / 4 Days for Two Adults + Two Children", GmFamily,

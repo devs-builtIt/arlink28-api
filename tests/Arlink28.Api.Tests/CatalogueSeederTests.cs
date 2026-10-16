@@ -147,6 +147,36 @@ public sealed class CatalogueSeederTests : IDisposable
         Assert.Equal(1, await _db.Properties.CountAsync());
     }
 
+    /// <summary>The in-memory database accepts any length, Postgres does not: check against the model's column sizes.</summary>
+    private async Task AssertFitsColumns<T>(IQueryable<T> rows) where T : class
+    {
+        var entity = _db.Model.FindEntityType(typeof(T))!;
+        foreach (var row in await rows.ToListAsync())
+        foreach (var prop in entity.GetProperties().Where(p => p.ClrType == typeof(string) && p.GetMaxLength() is not null))
+        {
+            if (prop.PropertyInfo?.GetValue(row) is string value)
+                Assert.True(value.Length <= prop.GetMaxLength(),
+                    $"{typeof(T).Name}.{prop.Name} is {value.Length} characters but the column holds {prop.GetMaxLength()}: \"{value[..Math.Min(60, value.Length)]}\"");
+        }
+    }
+
+    [Fact]
+    public async Task Every_seeded_text_fits_its_database_column()
+    {
+        await SeedGiraffeManor();
+
+        await AssertFitsColumns(_db.Packages);
+        await AssertFitsColumns(_db.PackageFeatures);
+        await AssertFitsColumns(_db.PackageStays);
+        await AssertFitsColumns(_db.PackageAddOns);
+        await AssertFitsColumns(_db.PackageMedia);
+        await AssertFitsColumns(_db.Destinations);
+        await AssertFitsColumns(_db.Properties);
+        await AssertFitsColumns(_db.Features);
+        await AssertFitsColumns(_db.Seasons);
+        await AssertFitsColumns(_db.Partners);
+    }
+
     [Fact]
     public async Task An_unknown_slug_stops_the_seed_before_anything_is_written()
     {

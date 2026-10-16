@@ -275,7 +275,8 @@ public static class CatalogueSeedData
         T("Check-in is from 12 noon and check-out is by 10:00 a.m."),
         T("An early arrival or a late departure may need Retreat access booked separately, subject to availability."),
         T("Arrival and departure transfers are included when the arrival collection is after 11:30 a.m. and the departure transfer is before the 10:00 a.m. check-out."),
-        T("Children aged 3 to 11 are classed as children, guests aged 12 and over as adults, and infants aged 0 to 2 stay free. Child sharing and extra bed arrangements are confirmed with the booking where they apply."),
+        T("Children aged 3 to 11 are classed as children, guests aged 12 and over as adults, and infants aged 0 to 2 stay free."),
+        T("Child sharing and extra bed arrangements are confirmed with the booking where they apply."),
     ];
 
     private static Dictionary<FeatureSection, FeatureRef[]> GmFeaturesNoted(params FeatureRef[] extraNotes) => new()

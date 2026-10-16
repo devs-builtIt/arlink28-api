@@ -279,6 +279,27 @@ public class CatalogueSeeder(ApplicationDbContext db, ILogger<CatalogueSeeder> l
                     });
                 }
 
+                if (p.Photos is { Length: > 0 })
+                {
+                    // Seeded photos are static files; a reseed replaces them. Photos staff uploaded (under /media/) stay.
+                    var seeded = package.Media.Where(m => m.Path.StartsWith("/images/", StringComparison.Ordinal)).ToList();
+                    db.PackageMedia.RemoveRange(seeded);
+                    foreach (var m in seeded) package.Media.Remove(m);
+
+                    var hasHero = package.Media.Any(m => m.Role == MediaRole.Hero);
+                    var sortKey = package.Media.Count == 0 ? 0 : package.Media.Max(m => m.SortKey) + 1;
+                    for (var i = 0; i < p.Photos.Length; i++)
+                    {
+                        db.PackageMedia.Add(new PackageMedia
+                        {
+                            Id = Guid.NewGuid(), PackageId = package.Id,
+                            Role = i == 0 && !hasHero ? MediaRole.Hero : MediaRole.Gallery,
+                            Path = p.Photos[i].Path, Alt = p.Photos[i].Alt,
+                            VariantsReady = true, SortKey = sortKey++, CreatedAt = now,
+                        });
+                    }
+                }
+
                 db.AuditLogs.Add(new AuditLog
                 {
                     Id = Guid.NewGuid(),

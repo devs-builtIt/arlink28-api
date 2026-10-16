@@ -143,8 +143,69 @@ public sealed class CatalogueSeederTests : IDisposable
         Assert.Equal(FlyerPrices.Count, await _db.Packages.CountAsync());
         Assert.Equal(FlyerPrices.Count, await _db.PackageRates.CountAsync());
         Assert.Equal(FlyerPrices.Count, await _db.PackageAddOns.CountAsync());
-        Assert.Equal(FlyerPrices.Count, await _db.PackageMedia.CountAsync());
+        Assert.Equal(FlyerPrices.Count * 5, await _db.PackageMedia.CountAsync());
         Assert.Equal(1, await _db.Properties.CountAsync());
+    }
+
+    [Fact]
+    public async Task Each_package_has_a_hero_and_four_supporting_photos_and_opens_on_its_own_hero()
+    {
+        await SeedGiraffeManor();
+        var packages = await _db.Packages.Include(p => p.Media).ToListAsync();
+
+        Assert.All(packages, p =>
+        {
+            Assert.Equal(5, p.Media.Count);
+            var ordered = p.Media.OrderBy(m => m.SortKey).ToList();
+            Assert.Equal(MediaRole.Hero, ordered[0].Role);
+            Assert.All(ordered.Skip(1), m => Assert.Equal(MediaRole.Gallery, m.Role));
+            Assert.Equal(5, p.Media.Select(m => m.Path).Distinct().Count());
+            Assert.Equal(5, p.Media.Select(m => m.SortKey).Distinct().Count());
+            Assert.All(p.Media, m =>
+            {
+                Assert.StartsWith("/images/packages/gm-", m.Path);
+                Assert.False(string.IsNullOrWhiteSpace(m.Alt));
+            });
+        });
+        // Six packages, six different heroes.
+        Assert.Equal(6, packages.Select(p => p.Media.Single(m => m.Role == MediaRole.Hero).Path).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task A_reseed_replaces_the_old_seeded_hero_and_keeps_what_staff_uploaded()
+    {
+        await SeedGiraffeManor();
+        var solo = await _db.Packages.Include(p => p.Media).SingleAsync(p => p.Slug == "giraffe-manor-solo-escape");
+        // What production has from the first seed: a single seeded hero. And one photo uploaded in the admin.
+        _db.PackageMedia.RemoveRange(solo.Media);
+        _db.PackageMedia.AddRange(
+            new PackageMedia { Id = Guid.NewGuid(), PackageId = solo.Id, Role = MediaRole.Hero, Path = "/images/packages/gm-solo-escape.jpg", SortKey = 0, CreatedAt = DateTime.UtcNow },
+            new PackageMedia { Id = Guid.NewGuid(), PackageId = solo.Id, Role = MediaRole.Gallery, Path = "/media/packages/x/uploaded.jpg", SortKey = 1, CreatedAt = DateTime.UtcNow });
+        await _db.SaveChangesAsync();
+
+        await SeedGiraffeManor();
+        var media = await _db.PackageMedia.Where(m => m.PackageId == solo.Id).OrderBy(m => m.SortKey).ToListAsync();
+
+        Assert.DoesNotContain(media, m => m.Path == "/images/packages/gm-solo-escape.jpg");
+        Assert.Contains(media, m => m.Path == "/media/packages/x/uploaded.jpg");
+        Assert.Equal(6, media.Count); // the upload plus five seeded
+        Assert.Single(media, m => m.Role == MediaRole.Hero);
+    }
+
+    [Fact]
+    public async Task An_uploaded_hero_stays_the_hero_and_the_seeded_photos_become_gallery()
+    {
+        await SeedGiraffeManor();
+        var solo = await _db.Packages.Include(p => p.Media).SingleAsync(p => p.Slug == "giraffe-manor-solo-escape");
+        _db.PackageMedia.RemoveRange(solo.Media);
+        _db.PackageMedia.Add(new PackageMedia { Id = Guid.NewGuid(), PackageId = solo.Id, Role = MediaRole.Hero, Path = "/media/packages/x/real-hero.jpg", SortKey = 0, CreatedAt = DateTime.UtcNow });
+        await _db.SaveChangesAsync();
+
+        await SeedGiraffeManor();
+        var media = await _db.PackageMedia.Where(m => m.PackageId == solo.Id).ToListAsync();
+
+        Assert.Equal("/media/packages/x/real-hero.jpg", media.Single(m => m.Role == MediaRole.Hero).Path);
+        Assert.Equal(5, media.Count(m => m.Role == MediaRole.Gallery));
     }
 
     /// <summary>The in-memory database accepts any length, Postgres does not: check against the model's column sizes.</summary>

@@ -322,6 +322,9 @@ public static class CatalogueSeedData
         "dining" => new(Hero("gm-dining.jpg") + "?for=" + package, "A lodge dining room with a timber ceiling"),
         "lodge" => new(Hero("gm-lodge.jpg") + "?for=" + package, "The open-air lounge of a thatched lodge"),
         "savanna" => new(Hero("gm-savanna.jpg") + "?for=" + package, "An acacia tree at sunset on the savanna"),
+        "lion" => new(Hero("stock-lion.jpg") + "?for=" + package, "A lion resting in tall grass"),
+        "elephants" => new(Hero("stock-elephants.jpg") + "?for=" + package, "Elephants crossing a dirt road"),
+        "lodgepool" => new(Hero("stock-lodgepool.jpg") + "?for=" + package, "A safari lodge and its pool at dusk"),
         _ => throw new ArgumentException(name),
     };
 
@@ -337,7 +340,8 @@ public static class CatalogueSeedData
             SalaFeatures(2, "Sala Mara Escape", "two adults"),
             [new(Savings, 747_200)],
             [PrivateVehicle],
-            ["WhatsApp Image 2026-09-25 at 02.19.33.jpeg"]),
+            ["WhatsApp Image 2026-09-25 at 02.19.33.jpeg"],
+            Photos: Pics("sala-mara-escape", "lodgepool", "lion", "savanna", "elephants", "lodge")),
 
         new("salas-classic-safari", PackageStatus.Published, "Sala's Classic Safari",
             "3-Night Fully Inclusive Luxury Masai Mara Safari Experience for Two Adults", SalaSummary,
@@ -346,7 +350,8 @@ public static class CatalogueSeedData
             SalaFeatures(3, "Sala's Classic Safari", "two adults"),
             [new(Peak, 1_775_000)],
             [PrivateVehicle],
-            ["WhatsApp Image 2026-09-25 at 02.19.33 (1).jpeg"]),
+            ["WhatsApp Image 2026-09-25 at 02.19.33 (1).jpeg"],
+            Photos: Pics("salas-classic-safari", "lion", "lodgepool", "herd", "lodge", "savanna")),
 
         new("salas-extended-mara-experience", PackageStatus.Draft, "Sala's Extended Mara Experience",
             "4-Night Fully Inclusive Luxury Masai Mara Safari Experience for Two Adults", SalaSummary,
@@ -357,7 +362,8 @@ public static class CatalogueSeedData
             [PrivateVehicle],
             ["WhatsApp Image 2026-09-25 at 02.19.33 (2).jpeg", "WhatsApp Image 2026-09-25 at 02.19.33 (3).jpeg"],
             DataIssue: "Both posters say 'Savings Season' with the same dates but show $14,944 and $23,666. $23,666 matches the peak " +
-                       "per-night rate of Sala's Classic Safari ($17,750 / 3 × 4), so it is seeded as the peak rate. Confirm with the partner."),
+                       "per-night rate of Sala's Classic Safari ($17,750 / 3 × 4), so it is seeded as the peak rate. Confirm with the partner.",
+            Photos: Pics("salas-extended-mara-experience", "savanna", "lodgepool", "lion", "lodge", "herd")),
 
         new("salas-family-safari", PackageStatus.Draft, "Sala's Family Safari",
             "4-Night Fully Inclusive Luxury Masai Mara Safari Experience for Two Adults & Two Children", SalaSummary,
@@ -368,7 +374,8 @@ public static class CatalogueSeedData
             [PrivateVehicle],
             ["WhatsApp Image 2026-09-25 at 02.19.33 (4).jpeg", "WhatsApp Image 2026-09-25 at 02.19.34 (4).jpeg"],
             DataIssue: "Both posters show the PEAK season dates but different prices ($37,882 and $26,884). The lower price is seeded as " +
-                       "the savings rate by analogy with the other two-season packages, which is a guess. Confirm with the partner."),
+                       "the savings rate by analogy with the other two-season packages, which is a guess. Confirm with the partner.",
+            Photos: Pics("salas-family-safari", "herd", "lodgepool", "elephants", "lion", "savanna")),
 
         // ---- The Safari Collection: multi-camp ----------------------------------
         new("safari-collection-explorer", PackageStatus.Draft, "Safari Collection Explorer",
@@ -389,7 +396,8 @@ public static class CatalogueSeedData
             ["WhatsApp Image 2026-09-25 at 02.19.34 (2).jpeg", "WhatsApp Image 2026-09-25 at 02.19.34 (3).jpeg"],
             DataIssue: "The savings poster ($19,369) is 4 nights Sasaab + 3 nights Sala's Camp; the peak poster ($33,985) is 4 nights " +
                        "Sala's Camp + 3 nights Sasaab. One package has one itinerary: seeded with the peak split. Confirm whether these " +
-                       "are two different products."),
+                       "are two different products.",
+            Photos: Pics("safari-collection-explorer", "lodge", "elephants", "savanna", "lion", "lodgepool")),
 
         new("ultimate-safari-collection-journey", PackageStatus.Published, "Ultimate Safari Collection Journey",
             "10-Night Premium Long-Stay Safari for Two Adults", MultiSummary,
@@ -406,7 +414,8 @@ public static class CatalogueSeedData
             },
             [new(Savings, 3_088_900), new(Peak, 4_484_800)],
             [PrivateVehicle],
-            ["WhatsApp Image 2026-09-25 at 02.19.34.jpeg", "WhatsApp Image 2026-09-25 at 02.19.34 (1).jpeg"]),
+            ["WhatsApp Image 2026-09-25 at 02.19.34.jpeg", "WhatsApp Image 2026-09-25 at 02.19.34 (1).jpeg"],
+            Photos: Pics("ultimate-safari-collection-journey", "elephants", "savanna", "lion", "lodge", "lodgepool")),
 
         // ---- Giraffe Manor, Nairobi ---------------------------------------------
         // The six packages on the 2026-10-08 flyers (the "Giraffe Manor" folder). The older Giraffe Manor posters
@@ -498,7 +507,7 @@ public static class CatalogueSeedData
             ["WhatsApp Image 2026-09-25 at 02.19.36 (1).jpeg"],
             HeroImage: Hero("giraffe-manor-family-celebration-3.jpg")),
 
-        new("giraffe-and-nairobi-wildlife-escape", PackageStatus.Published, "Giraffe and Nairobi Wildlife Escape",
+        new("giraffe-and-nairobi-wildlife-escape", PackageStatus.Draft, "Giraffe and Nairobi Wildlife Escape",
             "2 Nights / 3 Days for Two Adults", "Experience the best of Nairobi's wildlife and iconic landscapes.",
             "SAFARI", "nairobi", 2, 2, 2, 0, 170,
             [new("giraffe-manor", 2)],
@@ -521,6 +530,32 @@ public static class CatalogueSeedData
             },
             [new(Gm2026, 658_900)], [],
             ["WhatsApp Image 2026-09-25 at 02.19.37.jpeg"],
-            HeroImage: Hero("giraffe-nairobi-wildlife-escape.jpg")),
+            DataIssue: "Not on the 2026-10-08 Giraffe Manor flyers: it comes from the older poster only. Its Included list says " +
+                       "'Park fees' while its note says Nairobi National Park fees are not included. Confirm it is still offered, " +
+                       "its price and the park-fee wording before publishing.",
+            Photos: Pics("giraffe-and-nairobi-wildlife-escape", "giraffe", "herd", "lion", "elephants", "savanna")),
+    ];
+
+    /// <summary>
+    /// The packages that go to production, and what local and staging hold alongside them: the six Giraffe Manor
+    /// flyers of 2026-10-08 and the Safari Collection (the clean ones published, the ones whose posters contradict
+    /// each other as drafts), plus the Nairobi wildlife escape as a draft. The older Giraffe Manor tiers are left
+    /// out: the new flyers replace them. Load with `seed-catalogue --launch`.
+    /// </summary>
+    public static readonly string[] LaunchSlugs =
+    [
+        "giraffe-manor-solo-escape",
+        "giraffe-manor-signature-escape",
+        "giraffe-manor-family-experience",
+        "giraffe-manor-extended-family-package",
+        "giraffe-manor-family-and-friends-retreat-3-adults",
+        "giraffe-manor-family-and-friends-retreat-4-adults",
+        "sala-mara-escape",
+        "salas-classic-safari",
+        "ultimate-safari-collection-journey",
+        "salas-extended-mara-experience",
+        "salas-family-safari",
+        "safari-collection-explorer",
+        "giraffe-and-nairobi-wildlife-escape",
     ];
 }

@@ -77,9 +77,39 @@ public class CatalogueSeeder(ApplicationDbContext db, ILogger<CatalogueSeeder> l
             .Select(r => (long?)r.PriceMinor)
             .Min();
 
-    public async Task<IReadOnlyList<SeedResult>> SeedAsync(DateOnly today, CancellationToken ct = default)
+    /// <summary>
+    /// Loads the catalogue. With <paramref name="only"/>, loads just those packages and the destinations, partners,
+    /// properties, seasons and features they need, so a first release can go out without the rest of the poster data.
+    /// </summary>
+    public async Task<IReadOnlyList<SeedResult>> SeedAsync(DateOnly today, IReadOnlySet<string>? only = null, CancellationToken ct = default)
     {
         Validate();
+
+        var selected = only is null
+            ? CatalogueSeedData.Packages
+            : CatalogueSeedData.Packages.Where(p => only.Contains(p.Slug)).ToArray();
+        if (only is not null)
+        {
+            var unknown = only.Except(selected.Select(p => p.Slug)).ToList();
+            if (unknown.Count > 0) throw new InvalidOperationException("No such package in the seed: " + string.Join(", ", unknown));
+        }
+
+        var seasonSlugs = selected.SelectMany(p => p.Rates.Select(r => r.Season)).ToHashSet();
+        var seasonsToLoad = CatalogueSeedData.Seasons.Where(s => only is null || seasonSlugs.Contains(s.Slug)).ToArray();
+        var propertySlugs = selected.SelectMany(p => p.Stays.Select(s => s.Property)).ToHashSet();
+        var propertiesToLoad = CatalogueSeedData.Properties.Where(x => only is null || propertySlugs.Contains(x.Slug)).ToArray();
+        var partnerSlugs = propertiesToLoad.Select(x => x.Partner).Concat(seasonsToLoad.Select(x => x.Partner)).ToHashSet();
+        var partnersToLoad = CatalogueSeedData.Partners.Where(x => only is null || partnerSlugs.Contains(x.Slug)).ToArray();
+        var featureKeys = selected.SelectMany(p => p.Features.Values.SelectMany(x => x)).Where(f => f.Key is not null).Select(f => f.Key!).ToHashSet();
+        var featuresToLoad = CatalogueSeedData.Features.Where(x => only is null || featureKeys.Contains(x.Slug)).ToArray();
+        var destinationSlugs = selected.Select(p => p.Destination).Concat(propertiesToLoad.Select(x => x.Destination)).ToHashSet();
+        foreach (var slug in destinationSlugs.ToList())
+        {
+            // A place needs its country, which is its parent.
+            var parent = CatalogueSeedData.Destinations.First(d => d.Slug == slug).Parent;
+            if (parent is not null) destinationSlugs.Add(parent);
+        }
+        var destinationsToLoad = CatalogueSeedData.Destinations.Where(d => only is null || destinationSlugs.Contains(d.Slug)).ToArray();
 
         var strategy = db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
@@ -89,7 +119,7 @@ public class CatalogueSeeder(ApplicationDbContext db, ILogger<CatalogueSeeder> l
             var now = DateTime.UtcNow;
 
             var destinations = new Dictionary<string, Destination>();
-            foreach (var d in CatalogueSeedData.Destinations)
+            foreach (var d in destinationsToLoad)
             {
                 var row = await db.Destinations.FirstOrDefaultAsync(x => x.Slug == d.Slug, ct)
                           ?? db.Destinations.Add(new Destination { Id = Guid.NewGuid(), Slug = d.Slug, Status = d.Status, CreatedAt = now, PublishedAt = d.Status == DestinationStatus.Published ? now : null }).Entity;
@@ -99,11 +129,11 @@ public class CatalogueSeeder(ApplicationDbContext db, ILogger<CatalogueSeeder> l
                 row.UpdatedAt = now;
                 destinations[d.Slug] = row;
             }
-            foreach (var d in CatalogueSeedData.Destinations)
+            foreach (var d in destinationsToLoad)
                 destinations[d.Slug].Parent = d.Parent is null ? null : destinations[d.Parent];
 
             var partners = new Dictionary<string, Partner>();
-            foreach (var p in CatalogueSeedData.Partners)
+            foreach (var p in partnersToLoad)
             {
                 var row = await db.Partners.FirstOrDefaultAsync(x => x.Slug == p.Slug, ct)
                           ?? db.Partners.Add(new Partner { Id = Guid.NewGuid(), Slug = p.Slug, CreatedAt = now }).Entity;
@@ -114,7 +144,7 @@ public class CatalogueSeeder(ApplicationDbContext db, ILogger<CatalogueSeeder> l
             }
 
             var properties = new Dictionary<string, Property>();
-            foreach (var p in CatalogueSeedData.Properties)
+            foreach (var p in propertiesToLoad)
             {
                 var row = await db.Properties.FirstOrDefaultAsync(x => x.Slug == p.Slug, ct)
                           ?? db.Properties.Add(new Property { Id = Guid.NewGuid(), Slug = p.Slug, CreatedAt = now }).Entity;
@@ -126,7 +156,7 @@ public class CatalogueSeeder(ApplicationDbContext db, ILogger<CatalogueSeeder> l
             }
 
             var features = new Dictionary<string, Feature>();
-            foreach (var f in CatalogueSeedData.Features)
+            foreach (var f in featuresToLoad)
             {
                 var row = await db.Features.FirstOrDefaultAsync(x => x.Slug == f.Slug, ct)
                           ?? db.Features.Add(new Feature { Id = Guid.NewGuid(), Slug = f.Slug, CreatedAt = now }).Entity;
@@ -136,7 +166,7 @@ public class CatalogueSeeder(ApplicationDbContext db, ILogger<CatalogueSeeder> l
             }
 
             var seasons = new Dictionary<string, Season>();
-            foreach (var s in CatalogueSeedData.Seasons)
+            foreach (var s in seasonsToLoad)
             {
                 var row = await db.Seasons.Include(x => x.Ranges).FirstOrDefaultAsync(x => x.Slug == s.Slug, ct)
                           ?? db.Seasons.Add(new Season { Id = Guid.NewGuid(), Slug = s.Slug, CreatedAt = now }).Entity;
@@ -161,7 +191,7 @@ public class CatalogueSeeder(ApplicationDbContext db, ILogger<CatalogueSeeder> l
             await db.SaveChangesAsync(ct);
 
             var results = new List<SeedResult>();
-            foreach (var p in CatalogueSeedData.Packages)
+            foreach (var p in selected)
             {
                 var existing = await db.Packages
                     .Include(x => x.Stays).Include(x => x.Features).Include(x => x.Rates)
@@ -185,6 +215,7 @@ public class CatalogueSeeder(ApplicationDbContext db, ILogger<CatalogueSeeder> l
                 package.BaseCurrency = CatalogueSeedData.BaseCurrency;
                 package.FromPriceMinor = FromPrice(p, today);
                 package.SortOrder = p.SortOrder;
+                if (p.Featured) package.Featured = true;
                 package.PublishedAt = p.Status == PackageStatus.Published ? existing?.PublishedAt ?? now : null;
                 package.UpdatedAt = now;
                 if (existing is not null) package.Version++;

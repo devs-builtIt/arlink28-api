@@ -217,8 +217,9 @@ try
         return;
     }
 
-    // `dotnet run -- seed-catalogue [--today=YYYY-MM-DD] [--allow-production]`
-    // loads the poster catalogue (Data/Seed) and exits without starting the server.
+    // `dotnet run -- seed-catalogue [--only=slug,slug] [--today=YYYY-MM-DD] [--allow-production]`
+    // loads the poster catalogue (Data/Seed), or just the named packages with what they need, and exits without
+    // starting the server.
     if (args.Length > 0 && args[0] == "seed-catalogue")
     {
         if (app.Environment.IsProduction() && !args.Contains("--allow-production"))
@@ -233,8 +234,13 @@ try
             ? DateOnly.FromDateTime(DateTime.UtcNow)
             : DateOnly.Parse(todayArg["--today=".Length..]);
 
+        var onlyArg = args.FirstOrDefault(a => a.StartsWith("--only="));
+        IReadOnlySet<string>? only = onlyArg is null
+            ? null
+            : onlyArg["--only=".Length..].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet();
+
         using var seedScope = app.Services.CreateScope();
-        var results = await seedScope.ServiceProvider.GetRequiredService<CatalogueSeeder>().SeedAsync(today);
+        var results = await seedScope.ServiceProvider.GetRequiredService<CatalogueSeeder>().SeedAsync(today, only);
         foreach (var r in results)
             Console.WriteLine($"{r.Action,-8} {r.Status,-10} {r.Slug}{(r.DataIssue is null ? "" : "  (draft: " + r.DataIssue + ")")}");
         Console.WriteLine($"Seeded {results.Count} packages (from-prices as of {today:yyyy-MM-dd}).");

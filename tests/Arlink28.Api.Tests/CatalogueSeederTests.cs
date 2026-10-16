@@ -167,8 +167,12 @@ public sealed class CatalogueSeederTests : IDisposable
                 Assert.False(string.IsNullOrWhiteSpace(m.Alt));
             });
         });
-        // Six packages, six different heroes.
-        Assert.Equal(6, packages.Select(p => p.Media.Single(m => m.Role == MediaRole.Hero).Path).Distinct().Count());
+        // Six packages, six different hero photos (the same file under a different per-package URL does not count).
+        static string File(string path) => path.Split('?')[0];
+        Assert.Equal(6, packages.Select(p => File(p.Media.Single(m => m.Role == MediaRole.Hero).Path)).Distinct().Count());
+        // Postgres has a unique index on the media path across the whole catalogue; the in-memory database does not.
+        var all = await _db.PackageMedia.Select(m => m.Path).ToListAsync();
+        Assert.Equal(all.Count, all.Distinct().Count());
     }
 
     [Fact]

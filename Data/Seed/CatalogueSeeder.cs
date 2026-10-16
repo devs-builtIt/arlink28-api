@@ -285,6 +285,8 @@ public class CatalogueSeeder(ApplicationDbContext db, ILogger<CatalogueSeeder> l
                     var seeded = package.Media.Where(m => m.Path.StartsWith("/images/", StringComparison.Ordinal)).ToList();
                     db.PackageMedia.RemoveRange(seeded);
                     foreach (var m in seeded) package.Media.Remove(m);
+                    // Delete before inserting: the path is unique, and a reseed re-adds the same paths.
+                    if (seeded.Count > 0) await db.SaveChangesAsync(ct);
 
                     var hasHero = package.Media.Any(m => m.Role == MediaRole.Hero);
                     var sortKey = package.Media.Count == 0 ? 0 : package.Media.Max(m => m.SortKey) + 1;

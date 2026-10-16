@@ -312,18 +312,20 @@ public static class CatalogueSeedData
 
     // Stock photos standing in for Giraffe Manor's own photography (Unsplash licence, 2400 px wide). The same
     // six the local test photos use for Nairobi, shared by the flyer packages in a different order each.
-    private static SeedPhoto Pic(string name) => name switch
+    // A media path is unique across the whole catalogue (IX_PackageMedia_Path), so the shared files are given a
+    // per-package query string. Static file serving ignores it; it only makes each package's URL its own.
+    private static SeedPhoto Pic(string name, string package) => name switch
     {
-        "giraffe" => new(Hero("gm-giraffe.jpg"), "A giraffe on the open plains"),
-        "herd" => new(Hero("gm-herd.jpg"), "Giraffes crossing dry grassland"),
-        "pool" => new(Hero("gm-pool.jpg"), "A guest watching a giraffe from a lodge pool"),
-        "dining" => new(Hero("gm-dining.jpg"), "A lodge dining room with a timber ceiling"),
-        "lodge" => new(Hero("gm-lodge.jpg"), "The open-air lounge of a thatched lodge"),
-        "savanna" => new(Hero("gm-savanna.jpg"), "An acacia tree at sunset on the savanna"),
+        "giraffe" => new(Hero("gm-giraffe.jpg") + "?for=" + package, "A giraffe on the open plains"),
+        "herd" => new(Hero("gm-herd.jpg") + "?for=" + package, "Giraffes crossing dry grassland"),
+        "pool" => new(Hero("gm-pool.jpg") + "?for=" + package, "A guest watching a giraffe from a lodge pool"),
+        "dining" => new(Hero("gm-dining.jpg") + "?for=" + package, "A lodge dining room with a timber ceiling"),
+        "lodge" => new(Hero("gm-lodge.jpg") + "?for=" + package, "The open-air lounge of a thatched lodge"),
+        "savanna" => new(Hero("gm-savanna.jpg") + "?for=" + package, "An acacia tree at sunset on the savanna"),
         _ => throw new ArgumentException(name),
     };
 
-    private static SeedPhoto[] Pics(params string[] names) => names.Select(Pic).ToArray();
+    private static SeedPhoto[] Pics(string package, params string[] names) => names.Select(n => Pic(n, package)).ToArray();
 
     public static readonly SeedPackage[] Packages =
     [
@@ -416,7 +418,7 @@ public static class CatalogueSeedData
             [new("giraffe-manor", 3, "Superior Single Room")], GmFeaturesNoted(),
             [new(Gm2026, 698_670)], [GmParkDrive],
             ["WhatsApp Image 2026-10-08 at 15.36.45.jpeg", "WhatsApp Image 2026-10-08 at 15.36.46 (1).jpeg"],
-            Featured: true, Photos: Pics("pool", "giraffe", "dining", "lodge", "savanna")),
+            Featured: true, Photos: Pics("giraffe-manor-solo-escape", "pool", "giraffe", "dining", "lodge", "savanna")),
 
         new("giraffe-manor-signature-escape", PackageStatus.Published, "Giraffe Manor Signature Escape",
             "5 Nights / 6 Days for Two Adults",
@@ -425,7 +427,7 @@ public static class CatalogueSeedData
             [new("giraffe-manor", 5, "Superior Room")], GmFeaturesNoted(),
             [new(Gm2026, 1_413_000)], [GmParkDrive],
             ["WhatsApp Image 2026-10-08 at 15.36.45 (1).jpeg", "WhatsApp Image 2026-10-08 at 15.36.46 (1).jpeg"],
-            Featured: true, Photos: Pics("giraffe", "dining", "pool", "lodge", "herd")),
+            Featured: true, Photos: Pics("giraffe-manor-signature-escape", "giraffe", "dining", "pool", "lodge", "herd")),
 
         new("giraffe-manor-family-experience", PackageStatus.Published, "Giraffe Manor Family Experience",
             "5 Nights / 6 Days for Two Adults + Up to Two Children",
@@ -434,7 +436,7 @@ public static class CatalogueSeedData
             [new("giraffe-manor", 5, "Karen Blixen / Finch Hatton Suite")], GmFeaturesNoted(),
             [new(Gm2026, 2_657_600)], [GmParkDrive],
             ["WhatsApp Image 2026-10-08 at 15.36.45 (2).jpeg", "WhatsApp Image 2026-10-08 at 15.36.46 (1).jpeg"],
-            Featured: true, Photos: Pics("herd", "giraffe", "lodge", "dining", "savanna")),
+            Featured: true, Photos: Pics("giraffe-manor-family-experience", "herd", "giraffe", "lodge", "dining", "savanna")),
 
         new("giraffe-manor-extended-family-package", PackageStatus.Published, "Giraffe Manor Extended Family Package",
             "5 Nights / 6 Days for Two Adults + Three Children",
@@ -443,7 +445,7 @@ public static class CatalogueSeedData
             [new("giraffe-manor", 5, "Karen Blixen / Finch Hatton Suites")], GmFeaturesNoted(T("A third child is charged in addition to the suite minimum.")),
             [new(Gm2026, 2_863_350)], [GmParkDrive],
             ["WhatsApp Image 2026-10-08 at 15.36.45 (3).jpeg", "WhatsApp Image 2026-10-08 at 15.36.46 (1).jpeg"],
-            Featured: true, Photos: Pics("lodge", "giraffe", "herd", "pool", "dining")),
+            Featured: true, Photos: Pics("giraffe-manor-extended-family-package", "lodge", "giraffe", "herd", "pool", "dining")),
 
         new("giraffe-manor-family-and-friends-retreat-3-adults", PackageStatus.Published, "Giraffe Manor Family and Friends Retreat (3 Adults)",
             "7 Nights / 8 Days for Three Adults",
@@ -452,7 +454,7 @@ public static class CatalogueSeedData
             [new("giraffe-manor", 7, "Karen Blixen / Finch Hatton Suites")], GmFeaturesNoted(),
             [new(Gm2026, 3_720_640)], [GmParkDrive],
             ["WhatsApp Image 2026-10-08 at 15.36.45 (4).jpeg", "WhatsApp Image 2026-10-08 at 15.36.46 (1).jpeg"],
-            Featured: true, Photos: Pics("dining", "lodge", "giraffe", "savanna", "herd")),
+            Featured: true, Photos: Pics("giraffe-manor-family-and-friends-retreat-3-adults", "dining", "lodge", "giraffe", "savanna", "herd")),
 
         new("giraffe-manor-family-and-friends-retreat-4-adults", PackageStatus.Published, "Giraffe Manor Family and Friends Retreat (4 Adults)",
             "7 Nights / 8 Days for Four Adults",
@@ -461,7 +463,7 @@ public static class CatalogueSeedData
             [new("giraffe-manor", 7, "Karen Blixen / Finch Hatton Suite")], GmFeaturesNoted(),
             [new(Gm2026, 4_154_220)], [GmParkDrive],
             ["WhatsApp Image 2026-10-08 at 15.36.46.jpeg", "WhatsApp Image 2026-10-08 at 15.36.46 (1).jpeg"],
-            Featured: true, Photos: Pics("savanna", "herd", "giraffe", "lodge", "pool")),
+            Featured: true, Photos: Pics("giraffe-manor-family-and-friends-retreat-4-adults", "savanna", "herd", "giraffe", "lodge", "pool")),
 
         new("giraffe-manor-grand-escape", PackageStatus.Published, "Giraffe Manor Grand Escape",
             "3 Nights / 4 Days for Two Adults", GmElegance,

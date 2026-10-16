@@ -242,6 +242,99 @@ public sealed class CatalogueSeederTests : IDisposable
         await AssertFitsColumns(_db.Partners);
     }
 
+    // ---- The launch set: what goes to production, and local and staging alongside it ----
+
+    private static readonly SeedPackage[] Launch =
+        CatalogueSeedData.LaunchSlugs.Select(slug => CatalogueSeedData.Packages.Single(p => p.Slug == slug)).ToArray();
+
+    private Task<IReadOnlyList<SeedResult>> SeedLaunch() => _seeder.SeedAsync(Today, CatalogueSeedData.LaunchSlugs.ToHashSet());
+
+    [Fact]
+    public void The_launch_set_has_no_duplicates()
+    {
+        Assert.Equal(CatalogueSeedData.LaunchSlugs.Length, CatalogueSeedData.LaunchSlugs.Distinct().Count());
+        Assert.Equal(Launch.Length, Launch.Select(p => p.Title).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        // No two packages describe the same stay: same properties and nights, same party.
+        var stays = Launch.Select(p => string.Join("+", p.Stays.Select(s => $"{s.Property}:{s.Nights}")) + $"/{p.Adults}a{p.Children}c").ToList();
+        Assert.Equal(stays.Count, stays.Distinct().Count());
+    }
+
+    [Fact]
+    public void The_launch_set_leaves_out_the_older_giraffe_manor_posters_that_the_flyers_replace()
+    {
+        foreach (var old in new[]
+                 {
+                     "giraffe-manor-grand-escape", "giraffe-manor-luxury-escape",
+                     "giraffe-manor-family-celebration", "giraffe-manor-family-celebration-3-children",
+                 })
+            Assert.DoesNotContain(old, CatalogueSeedData.LaunchSlugs);
+    }
+
+    [Fact]
+    public void Every_launch_package_shows_photographs_never_the_flyer()
+    {
+        Assert.All(Launch, p =>
+        {
+            Assert.Null(p.HeroImage);
+            Assert.NotNull(p.Photos);
+            Assert.True(p.Photos!.Length >= 5, $"{p.Slug} has {p.Photos.Length} photos");
+            Assert.All(p.Photos, photo =>
+            {
+                var file = photo.Path.Split('?')[0].Split('/')[^1];
+                Assert.Matches(@"^(gm|stock)-[a-z]+\.jpg$", file);
+                Assert.DoesNotContain("WhatsApp", photo.Path);
+                Assert.False(string.IsNullOrWhiteSpace(photo.Alt));
+            });
+        });
+    }
+
+    [Fact]
+    public async Task Seeding_the_launch_set_creates_exactly_those_packages_and_nothing_else()
+    {
+        var results = await SeedLaunch();
+
+        Assert.Equal(CatalogueSeedData.LaunchSlugs.Order(), results.Select(r => r.Slug).Order());
+        var packages = await _db.Packages.Include(p => p.Media).ToListAsync();
+        Assert.Equal(CatalogueSeedData.LaunchSlugs.Order(), packages.Select(p => p.Slug).Order());
+        // Only holiday packages: none of the flight, hotel or visa sample listings.
+        Assert.All(packages, p => Assert.Equal(ProductType.HolidayPackage, p.ProductType));
+
+        Assert.Equal(9, packages.Count(p => p.Status == PackageStatus.Published));
+        Assert.Equal(["giraffe-and-nairobi-wildlife-escape", "safari-collection-explorer", "salas-extended-mara-experience", "salas-family-safari"],
+            packages.Where(p => p.Status == PackageStatus.Draft).Select(p => p.Slug).Order());
+        Assert.Equal(FlyerPrices.Keys.Order(), packages.Where(p => p.Featured).Select(p => p.Slug).Order());
+
+        // Five photos each, one hero, and no media path anywhere twice (Postgres has a unique index on it).
+        Assert.All(packages, p =>
+        {
+            Assert.Equal(5, p.Media.Count);
+            Assert.Single(p.Media, m => m.Role == MediaRole.Hero);
+            Assert.DoesNotContain(p.Media, m => m.Role == MediaRole.Poster || m.Path.Contains("WhatsApp"));
+        });
+        var paths = await _db.PackageMedia.Select(m => m.Path).ToListAsync();
+        Assert.Equal(paths.Count, paths.Distinct().Count());
+
+        // The Safari Collection brings its own destination, properties and two seasons; nothing from Zanzibar or Egypt.
+        Assert.Equal(["giraffe-manor", "salas-camp", "sasaab"], (await _db.Properties.Select(p => p.Slug).ToListAsync()).Order());
+        Assert.DoesNotContain(await _db.Destinations.Select(d => d.Slug).ToListAsync(), slug => slug is "giza" or "luxor" or "accra");
+    }
+
+    [Fact]
+    public async Task Every_launch_text_fits_its_database_column_and_a_reseed_changes_nothing()
+    {
+        await SeedLaunch();
+        await AssertFitsColumns(_db.Packages);
+        await AssertFitsColumns(_db.PackageFeatures);
+        await AssertFitsColumns(_db.PackageAddOns);
+        await AssertFitsColumns(_db.PackageMedia);
+        await AssertFitsColumns(_db.PackageStays);
+
+        var counts = (await _db.Packages.CountAsync(), await _db.PackageMedia.CountAsync(), await _db.PackageRates.CountAsync(), await _db.PackageFeatures.CountAsync());
+        var again = await SeedLaunch();
+        Assert.All(again, r => Assert.Equal("updated", r.Action));
+        Assert.Equal(counts, (await _db.Packages.CountAsync(), await _db.PackageMedia.CountAsync(), await _db.PackageRates.CountAsync(), await _db.PackageFeatures.CountAsync()));
+    }
+
     [Fact]
     public async Task An_unknown_slug_stops_the_seed_before_anything_is_written()
     {

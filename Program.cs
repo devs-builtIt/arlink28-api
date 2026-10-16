@@ -217,7 +217,7 @@ try
         return;
     }
 
-    // `dotnet run -- seed-catalogue [--only=slug,slug] [--today=YYYY-MM-DD] [--allow-production]`
+    // `dotnet run -- seed-catalogue [--launch | --only=slug,slug] [--today=YYYY-MM-DD] [--allow-production]`
     // loads the poster catalogue (Data/Seed), or just the named packages with what they need, and exits without
     // starting the server.
     if (args.Length > 0 && args[0] == "seed-catalogue")
@@ -235,9 +235,11 @@ try
             : DateOnly.Parse(todayArg["--today=".Length..]);
 
         var onlyArg = args.FirstOrDefault(a => a.StartsWith("--only="));
-        IReadOnlySet<string>? only = onlyArg is null
-            ? null
-            : onlyArg["--only=".Length..].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet();
+        IReadOnlySet<string>? only = args.Contains("--launch")
+            ? CatalogueSeedData.LaunchSlugs.ToHashSet()
+            : onlyArg is null
+                ? null
+                : onlyArg["--only=".Length..].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet();
 
         using var seedScope = app.Services.CreateScope();
         var results = await seedScope.ServiceProvider.GetRequiredService<CatalogueSeeder>().SeedAsync(today, only);
